@@ -17,7 +17,7 @@ Configure everything from one menu:
 ### 📜 Menu Hotkeys & Radial Menu
 - **Instant Shortcuts:** Bind any START-menu option to single buttons or multi-key combos (up to 4 inputs).
 - **Dynamic Mod Discovery:** Automatically finds and binds menu tabs added by other mods (such as Kanto Ascendant).
-- **Radial Wheel:** Hold a hotkey, point either analog stick, and release to select. Includes 9 screen anchor positions and 75%–150% scaling.
+- **Radial Wheel:** Hold a hotkey, point either analog stick, and release to select. Includes 9 screen anchor positions.
 
 ### 🚲 Travel Hotkeys (Overworld)
 - **Fly:** Instant Town Map flight when HM02 is in your Bag.

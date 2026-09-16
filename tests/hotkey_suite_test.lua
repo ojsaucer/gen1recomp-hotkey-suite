@@ -60,8 +60,6 @@ T.eq(ex.shared.radial.spec:get(), nil, "radial menu starts unbound")
 T.eq(ex.shared.radial.config().enabled, true, "radial menu defaults on")
 T.eq(ex.shared.radial.config().position, "center",
   "radial menu defaults to center")
-T.eq(ex.shared.radial.config().scale, 1,
-  "radial menu defaults to 100 percent")
 T.eq(ex.shared.touch.config().autofire, false, "touch autofire starts off")
 T.eq(ex.shared.touch.config().shortcuts, false, "touch shortcuts start off")
 for _, inputId in ipairs({ "keyboard", "gamepad" }) do

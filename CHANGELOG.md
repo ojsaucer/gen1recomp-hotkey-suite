@@ -6,8 +6,7 @@
 
 - A suite-level `UNASSIGN ALL` row beside Keyboard, Gamepad, and Touchscreen.
   It uses a Yes/No confirmation that defaults to No.
-- Nine placement choices and 75%, 100%, 125%, or 150% scale options for the
-  radial menu.
+- Nine placement choices for the radial menu.
 
 ### Changed
 

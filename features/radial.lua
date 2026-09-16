@@ -15,7 +15,6 @@ return function(mod, suite)
     bottom_left = "BOTTOM LEFT", bottom_center = "BOTTOM CENTER",
     bottom_right = "BOTTOM RIGHT",
   }
-  local SCALES = { 0.75, 1, 1.25, 1.5 }
 
   local function config()
     local cfg = mod.save:get("radial", {})
@@ -23,11 +22,6 @@ return function(mod, suite)
     if cfg.enabled == nil then cfg.enabled = true end
     cfg.stick = cfg.stick == "right" and "right" or "left"
     if not POSITION_LABELS[cfg.position] then cfg.position = "center" end
-    local validScale = false
-    for _, value in ipairs(SCALES) do
-      if cfg.scale == value then validScale = true break end
-    end
-    if not validScale then cfg.scale = 1 end
     return cfg
   end
   local function save(cfg) mod.save:set("radial", cfg) end
@@ -95,12 +89,10 @@ return function(mod, suite)
     local g = love.graphics
     local cfg = config()
     local centerX, centerY = centerFor(cfg.position)
-    local scale = cfg.scale
-    local minX, maxX = -centerX / scale, (160 - centerX) / scale
-    local minY, maxY = -centerY / scale, (144 - centerY) / scale
+    local minX, maxX = -centerX, 160 - centerX
+    local minY, maxY = -centerY, 144 - centerY
     g.push()
     g.translate(centerX, centerY)
-    g.scale(scale, scale)
     local function drawItem(i, item, selected)
       local angle = (i - 1) * 2 * math.pi / #self.items
       local anchorX = math.cos(angle) * 44
@@ -241,16 +233,6 @@ return function(mod, suite)
           step = function(_, dir)
             local cfg = config()
             cfg.position = shared.cycle(POSITIONS, cfg.position, dir)
-            save(cfg)
-            return true
-          end },
-        { id = "radialScale", label = "SCALE",
-          value = function()
-            return ("%d%%"):format(math.floor(config().scale * 100 + 0.5))
-          end,
-          step = function(_, dir)
-            local cfg = config()
-            cfg.scale = shared.cycle(SCALES, cfg.scale, dir)
             save(cfg)
             return true
           end },
