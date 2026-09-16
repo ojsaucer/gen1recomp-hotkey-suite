@@ -16,7 +16,6 @@ return function(mod, suite)
       and cfg.bindings.keyboard or {}
     cfg.bindings.gamepad = type(cfg.bindings.gamepad) == "table"
       and cfg.bindings.gamepad or {}
-    cfg.touch = type(cfg.touch) == "table" and cfg.touch or {}
     return cfg
   end
   local function save(cfg) mod.save:set("travel", cfg) end
@@ -122,70 +121,18 @@ return function(mod, suite)
     return rows
   end
 
-  local function touchRows()
-    local rows = {}
-    for _, action in ipairs(ACTIONS) do
-      local current = action
-      rows[#rows + 1] = {
-        id = "travel.touch." .. current.id,
-        label = current.label,
-        value = function()
-          return config().touch[current.id] and "ON" or "OFF"
-        end,
-        step = function()
-          local cfg = config()
-          cfg.touch[current.id] = not cfg.touch[current.id]
-          save(cfg)
-          return true
-        end,
-        unassign = function()
-          local cfg = config()
-          cfg.touch[current.id] = false
-          save(cfg)
-          return true
-        end,
-      }
-    end
-    return rows
-  end
-
   suite.register("keyboard", {
     id = "travel", label = "TRAVEL HOTKEYS", rows = rows,
   })
   suite.register("gamepad", {
     id = "travel", label = "TRAVEL HOTKEYS", rows = rows,
   })
-  suite.register("touchscreen", {
-    id = "travel", label = "TRAVEL HOTKEYS", rows = touchRows,
-  })
-
-  shared.registerStats(function()
-    local cfg = config()
-    local active = 0
-    for _, action in ipairs(ACTIONS) do
-      if cfg.touch[action.id] then active = active + 1 end
-    end
-    return active, active
-  end)
-
-  shared.registerReset(function()
-    local cfg = config()
-    for _, action in ipairs(ACTIONS) do cfg.touch[action.id] = false end
-    save(cfg)
-  end)
 
   shared.travel = {
     actions = ACTIONS,
     config = config,
     run = function(game, id)
       return run[id] and run[id](game) or false
-    end,
-    touchActions = function()
-      local cfg, out = config(), {}
-      for _, action in ipairs(ACTIONS) do
-        if cfg.touch[action.id] then out[#out + 1] = action end
-      end
-      return out
     end,
     specs = specs,
   }

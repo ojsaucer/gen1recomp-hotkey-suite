@@ -1,9 +1,9 @@
 # Hotkey Suite for Gen1Recomp
 
-A modular accessibility and input suite for **Keyboard**, **Gamepad**, and **Touchscreen** in Pokémon Red, Blue, and Yellow.
+A modular accessibility and input suite for **Keyboard** and **Gamepad** in Pokémon Red, Blue, and Yellow.
 
 Configure everything from one menu:  
-`OPTIONS > HOTKEY SUITE > KEYBOARD / GAMEPAD / TOUCHSCREEN`
+`OPTIONS > HOTKEY SUITE > KEYBOARD / GAMEPAD`
 
 ---
 
@@ -29,10 +29,6 @@ Configure everything from one menu:
 - **Instant Run:** Dedicated hotkey to attempt fleeing directly from the main battle menu.
 - **Custom Battle UI Compatible:** Automatically adapts to modded battle UIs (e.g. Floating Battle HUD, Voxel Ascendant) with a floating directional legend and real move names.
 
-### 📱 Touchscreen Controls
-- On-screen touch buttons for **Autofire**, **START Shortcuts**, **Travel actions**, and **Battle Commands**.
-- Smart layering stays clear of gameplay dialogues, native controls, and other UI mods.
-
 ---
 
 ## Binding & Input Highlights
@@ -56,4 +52,5 @@ Configure everything from one menu:
 ## License
 
 MIT
+
 

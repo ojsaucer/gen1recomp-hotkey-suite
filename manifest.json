@@ -10,7 +10,7 @@
   "permissions": ["engine_internals"],
   "games": ["red", "blue", "yellow"],
   "conflicts": ["autofire_hotkey", "menu_hotkeys", "radial_menu"],
-  "description": "A modular keyboard, gamepad, and touchscreen accessibility suite with autofire, menu, radial, travel, and battle hotkeys.",
+  "description": "A modular keyboard and gamepad accessibility suite with autofire, menu, radial, travel, and battle hotkeys.",
   "authors": ["ojsaucer"],
   "license": "MIT"
 }

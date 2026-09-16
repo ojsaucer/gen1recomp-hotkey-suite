@@ -12,7 +12,6 @@ local ex = run.loader.exports.hotkey_suite
 T.neq(ex, nil, "suite exports are reachable")
 T.eq(#ex.features.keyboard, 4, "keyboard includes travel and battle hotkeys")
 T.eq(#ex.features.gamepad, 5, "gamepad includes radial, travel, and battle hotkeys")
-T.eq(#ex.features.touchscreen, 4, "touch includes travel and battle controls")
 
 local expected = {
   keyboard = {
@@ -21,9 +20,6 @@ local expected = {
   gamepad = {
     autofire = true, menu_hotkeys = true, radial = true, travel = true,
     battle_hotkeys = true,
-  },
-  touchscreen = {
-    autofire = true, menu_shortcuts = true, travel = true, battle_hotkeys = true,
   },
 }
 for inputId, wanted in pairs(expected) do
@@ -60,8 +56,6 @@ T.eq(ex.shared.radial.spec:get(), nil, "radial menu starts unbound")
 T.eq(ex.shared.radial.config().enabled, true, "radial menu defaults on")
 T.eq(ex.shared.radial.config().position, "center",
   "radial menu defaults to center")
-T.eq(ex.shared.touch.config().autofire, false, "touch autofire starts off")
-T.eq(ex.shared.touch.config().shortcuts, false, "touch shortcuts start off")
 for _, inputId in ipairs({ "keyboard", "gamepad" }) do
   for _, actionId in ipairs({ "fly", "center", "bike" }) do
     T.eq(ex.shared.travel.specs[inputId][actionId]:get(), nil,
@@ -72,8 +66,6 @@ for _, inputId in ipairs({ "keyboard", "gamepad" }) do
   T.eq(ex.shared.battleHotkeys.specs.run[inputId]:get(), nil,
     inputId .. " instant run starts unbound")
 end
-T.eq(ex.shared.battleHotkeys.config().touch, false,
-  "touch battle command buttons start off")
 T.eq(ex.shared.battleHotkeys.config().legendPosition, "top_center",
   "custom battle UI legend defaults to top center")
 T.eq(ex.shared.battleHotkeys.config().legendScale, 1,

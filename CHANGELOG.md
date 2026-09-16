@@ -4,14 +4,16 @@
 
 ### Added
 
-- A suite-level `UNASSIGN ALL` row beside Keyboard, Gamepad, and Touchscreen.
+- A suite-level `UNASSIGN ALL` row beside Keyboard and Gamepad.
   It uses a Yes/No confirmation that defaults to No.
 - Nine placement choices for the radial menu.
 
 ### Changed
 
-- Suite-wide unassignment clears all keyboard/gamepad bindings and disables
-  assigned touchscreen controls while preserving unrelated behavior settings.
+- Streamlined scope to focus exclusively on Keyboard and Gamepad accessibility,
+  removing touchscreen controls.
+- Suite-wide unassignment clears all keyboard/gamepad bindings while
+  preserving unrelated behavior settings.
 
 ## [1.2.5] - 2026-09-15
 

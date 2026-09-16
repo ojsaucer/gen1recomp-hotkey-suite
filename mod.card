@@ -1,7 +1,7 @@
 return {
-  summary = "One modular accessibility hub for keyboard, gamepad, and touchscreen.",
+  summary = "One modular accessibility hub for keyboard and gamepad.",
   author = "ojsaucer",
-  tags = { "input", "accessibility", "hotkeys", "gamepad", "touchscreen" },
+  tags = { "input", "accessibility", "hotkeys", "gamepad", "keyboard" },
   differences = {
     changed = {
       "OPTIONS gains one HOTKEY SUITE entry with input, feature, and settings submenus",
@@ -10,15 +10,13 @@ return {
     added = {
       "keyboard/gamepad autofire and menu hotkeys",
       "gamepad radial menu with either-stick selection and LT/RT-capable binding",
-      "touchscreen autofire and three configurable START-menu shortcuts",
-      "keyboard, gamepad, and touchscreen travel shortcuts for Fly, Pokemon Center return, and Bicycle",
-      "battle command and instant-Run shortcuts for keyboard and gamepad, plus touchscreen command buttons",
+      "keyboard and gamepad travel shortcuts for Fly, Pokemon Center return, and Bicycle",
+      "battle command and instant-Run shortcuts for keyboard and gamepad",
       "confirmed suite-wide unassignment and configurable radial placement",
       "a feature registry for adding future accessibility modules without rebuilding the menu hierarchy",
     },
     known = {
       "the superseded standalone autofire_hotkey, menu_hotkeys, and radial_menu mods must remain disabled",
-      "touch shortcuts are handled only after native controls and other pointer mods decline the touch",
     },
   },
   credits = {

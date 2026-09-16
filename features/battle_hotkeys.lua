@@ -36,7 +36,6 @@ return function(mod, suite)
     local cfg = mod.save:get("battleHotkeys", {})
     if type(cfg) ~= "table" then cfg = {} end
     cfg.bindings = type(cfg.bindings) == "table" and cfg.bindings or {}
-    if cfg.touch == nil then cfg.touch = false end
     if not LEGEND_POSITION_LABELS[cfg.legendPosition] then
       cfg.legendPosition = "top_center"
     end
@@ -323,51 +322,7 @@ return function(mod, suite)
         scale = legendScale,
       }
     end
-    if not config().touch or not viewport or not commandReady(battleState(game)) then
-      return
-    end
-    local scale = viewport.scale or 1
-    local cells = {
-      { direction = "up", x = 4, y = 4 },
-      { direction = "right", x = 122, y = 4 },
-      { direction = "left", x = 4, y = 116 },
-      { direction = "down", x = 122, y = 116 },
-    }
-    local g = love.graphics
-    g.push("all")
-    g.origin()
-    g.translate(viewport.gameX or 0, viewport.gameY or 0)
-    g.scale(scale, scale)
-    for _, cell in ipairs(cells) do
-      local label = COMMANDS[cell.direction].label
-      g.setColor(1, 1, 1, 0.88)
-      g.rectangle("fill", cell.x, cell.y, 34, 24)
-      g.setColor(0, 0, 0, 1)
-      g.rectangle("line", cell.x, cell.y, 34, 24)
-      Font.draw(label,
-        cell.x + math.floor((34 - Font.width(label)) / 2), cell.y + 8)
-      touchRects[#touchRects + 1] = {
-        direction = cell.direction,
-        x = (viewport.gameX or 0) + cell.x * scale,
-        y = (viewport.gameY or 0) + cell.y * scale,
-        w = 34 * scale,
-        h = 24 * scale,
-      }
-    end
-    g.pop()
   end, 30000)
-
-  mod.hooks:wrap("input.pointer", function(next, game, ev)
-    if next(game, ev) then return true end
-    if ev.phase ~= "pressed" then return false end
-    for _, rect in ipairs(touchRects) do
-      if ev.x >= rect.x and ev.x <= rect.x + rect.w
-          and ev.y >= rect.y and ev.y <= rect.y + rect.h then
-        return choose(game, rect.direction)
-      end
-    end
-    return false
-  end)
 
   local function rows(_, inputId)
     local commandSpec = specs.commands[inputId]
@@ -430,48 +385,12 @@ return function(mod, suite)
     }
   end
 
-  local function touchRows()
-    return {
-      {
-        id = "battle.commands.touch",
-        label = "COMMAND BUTTONS",
-        value = function() return config().touch and "ON" or "OFF" end,
-        step = function()
-          local cfg = config()
-          cfg.touch = not cfg.touch
-          save(cfg)
-          return true
-        end,
-        unassign = function()
-          local cfg = config()
-          cfg.touch = false
-          save(cfg)
-          return true
-        end,
-      },
-    }
-  end
-
   suite.register("keyboard", {
     id = "battle_hotkeys", label = "BATTLE HOTKEYS", rows = rows,
   })
   suite.register("gamepad", {
     id = "battle_hotkeys", label = "BATTLE HOTKEYS", rows = rows,
   })
-  suite.register("touchscreen", {
-    id = "battle_hotkeys", label = "BATTLE HOTKEYS", rows = touchRows,
-  })
-
-  shared.registerStats(function()
-    return config().touch and 1 or 0, config().touch and 1 or 0
-  end)
-
-  shared.registerReset(function()
-    local cfg = config()
-    cfg.touch = false
-    save(cfg)
-    active.keyboard, active.gamepad = false, false
-  end)
 
   shared.battleHotkeys = {
     active = active,

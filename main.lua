@@ -8,7 +8,6 @@ local TextBox = require("src.render.TextBox")
 local INPUTS = {
   { id = "keyboard", label = "KEYBOARD" },
   { id = "gamepad", label = "GAMEPAD" },
-  { id = "touchscreen", label = "TOUCHSCREEN" },
 }
 
 local SettingsScreen = {}
@@ -135,7 +134,6 @@ return function(mod)
   suite.load("features/radial.lua")
   suite.load("features/travel.lua")
   suite.load("features/battle_hotkeys.lua")
-  suite.load("features/touch.lua")
 
   mod.hooks:wrap("ui.options.rows", function(next, game, rows)
     local out = next(game, rows)
