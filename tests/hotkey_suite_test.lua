@@ -10,16 +10,17 @@ T.eq(#run.errors, 0, "suite loads clean (" .. tostring(run.errors[1]) .. ")")
 
 local ex = run.loader.exports.hotkey_suite
 T.neq(ex, nil, "suite exports are reachable")
-T.eq(#ex.features.keyboard, 4, "keyboard includes travel and battle hotkeys")
-T.eq(#ex.features.gamepad, 5, "gamepad includes radial, travel, and battle hotkeys")
+T.eq(#ex.features.keyboard, 5, "keyboard includes travel, battle, and ball hotkeys")
+T.eq(#ex.features.gamepad, 6, "gamepad includes radial, travel, battle, and ball hotkeys")
 
 local expected = {
   keyboard = {
     autofire = true, menu_hotkeys = true, travel = true, battle_hotkeys = true,
+    ball_menu = true,
   },
   gamepad = {
     autofire = true, menu_hotkeys = true, radial = true, travel = true,
-    battle_hotkeys = true,
+    battle_hotkeys = true, ball_menu = true,
   },
 }
 for inputId, wanted in pairs(expected) do
@@ -31,12 +32,12 @@ local rows = Runtime.call("ui.options.rows", function(_, value) return value end
   {}, {})
 T.eq(#rows, 1, "suite adds one root OPTIONS row")
 T.eq(rows[1].id, "hotkeySuite", "root row is Hotkey Suite")
-T.eq(rows[1].value(), "0 ON / 0 SET",
-  "root row summarizes active and assigned hotkeys")
+T.eq(rows[1].value(), "0 SET",
+  "root row summarizes assigned hotkeys")
 
 for _, id in ipairs({
   "HotkeySuiteInputs", "HotkeySuiteCategories", "HotkeySuiteSettings",
-  "HotkeySuiteCapture", "HotkeySuiteRadial",
+  "HotkeySuiteCapture", "HotkeySuiteRadial", "HotkeySuiteBallMenu",
 }) do
   T.neq(run.loader.content.screens:get(id), nil, id .. " is registered")
 end
@@ -84,10 +85,16 @@ T.eq(ex.shared.battleHotkeys.customBattleUI({
 T.eq(ex.shared.battleHotkeys.customBattleUI({
   bottomUIVisible = function() return true end,
 }), false, "visible native battle UI keeps native arrow placement")
-for _, actionId in ipairs({ "fly", "center", "bike" }) do
-  T.eq(ex.shared.travel.config().touch[actionId], nil,
-    "touch " .. actionId .. " starts off")
-end
+T.eq(ex.shared.ballMenu.specs.keyboard:get(), nil,
+  "keyboard ball menu starts unbound")
+T.eq(ex.shared.ballMenu.specs.gamepad:get(), nil,
+  "gamepad ball menu starts unbound")
+T.eq(ex.shared.ballMenu.config().mode, "menu",
+  "ball menu defaults to menu mode")
+T.eq(ex.shared.ballMenu.config().position, "top_right",
+  "ball menu defaults to top right position")
+T.eq(ex.shared.ballMenu.config().quickBall, "FIRST",
+  "ball menu quick ball defaults to first in bag")
 local afRows = ex.features.keyboard[1].rows({}, "keyboard")
 T.neq(afRows[#afRows].unassign, nil, "hotkey rows expose SELECT-to-unassign")
 

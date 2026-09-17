@@ -24,9 +24,10 @@ Configure everything from one menu:
 - **Return to Pokémon Center:** Immediate teleport to your last visited Pokémon Center.
 - **Bicycle:** Fast toggle whenever the Bicycle is in your Bag.
 
-### ⚔️ Battle Hotkeys
+### ⚔️ Battle Hotkeys & Ball Menu
 - **Command Mode:** Hold a hotkey and press D-Pad / Direction keys (`Up`, `Right`, `Left`, `Down`) to directly select **FIGHT**, **PKMN**, **ITEM**, or **RUN**—or choose moves 1–4.
 - **Instant Run:** Dedicated hotkey to attempt fleeing directly from the main battle menu.
+- **Ball Menu / Quick Throw:** Assignable battle hotkey to open a custom Poké Ball selection UI showing ball types and bag quantities, or configure it as a "Quick Throw" button for your preferred ball. Includes 9 customizable UI positions.
 - **Custom Battle UI Compatible:** Automatically adapts to modded battle UIs (e.g. Floating Battle HUD, Voxel Ascendant) with a floating directional legend and real move names.
 
 ---

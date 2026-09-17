@@ -11,7 +11,7 @@ return {
       "keyboard/gamepad autofire and menu hotkeys",
       "gamepad radial menu with either-stick selection and LT/RT-capable binding",
       "keyboard and gamepad travel shortcuts for Fly, Pokemon Center return, and Bicycle",
-      "battle command and instant-Run shortcuts for keyboard and gamepad",
+      "battle command, instant-Run, and ball menu / quick-throw shortcuts for keyboard and gamepad",
       "confirmed suite-wide unassignment and configurable radial placement",
       "a feature registry for adding future accessibility modules without rebuilding the menu hierarchy",
     },

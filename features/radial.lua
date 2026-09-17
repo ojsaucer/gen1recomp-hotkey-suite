@@ -184,11 +184,15 @@ return function(mod, suite)
   mod.hooks:wrap("screen.render_visible", function(next, screen)
     if active then
       local found = false
-      for _, state in ipairs(active.game.stack.states or {}) do
-        if state == active then found = true break end end
+      local states = active.game and active.game.stack and active.game.stack.states
+      for _, state in ipairs(states or {}) do
+        if state == active then found = true break end
+      end
       if not found then active = nil end
     end
-    if active and screen ~= active and screen ~= active.game.stack.states[1] then
+    local base = active and active.game and active.game.stack
+      and active.game.stack.states and active.game.stack.states[1]
+    if active and screen ~= active and screen ~= base then
       return false
     end
     return next(screen)

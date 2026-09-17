@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.4.0] - 2026-09-17
+
+### Added
+
+- **Ball Menu / Quick Throw Hotkey**: Assignable battle-only hotkey for keyboard
+  and gamepad to open a custom Poké Ball selection UI showing ball types and
+  current bag quantities, or directly quick-throw a preferred ball. Includes 9
+  customizable UI anchor locations.
+
+### Changed
+
+- Simplified the root Hotkey Suite options row to display `# SET` (assigned
+  hotkeys count), removing the superfluous active count label.
+
+### Fixed
+
+- Hardened overworld menu safety checks against nil screen states during warps,
+  map transitions, and script movements (e.g. Victory Road boulder puzzles).
+- Added physical input state reconciliation for keyboard keys and gamepad
+  buttons to prevent ghost held inputs from blocking combos after screen changes.
+- Wrapped hotkey action and listener execution in protected calls so isolated
+  errors never break subsequent hotkeys or input polling.
+
 ## [1.3.0] - 2026-09-15
 
 ### Added

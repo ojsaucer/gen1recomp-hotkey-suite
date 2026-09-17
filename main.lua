@@ -134,6 +134,7 @@ return function(mod)
   suite.load("features/radial.lua")
   suite.load("features/travel.lua")
   suite.load("features/battle_hotkeys.lua")
+  suite.load("features/ball_menu.lua")
 
   mod.hooks:wrap("ui.options.rows", function(next, game, rows)
     local out = next(game, rows)
@@ -142,8 +143,8 @@ return function(mod)
       id = "hotkeySuite",
       label = Strings("HOTKEY SUITE"),
       value = function()
-        local active, assigned = suite.shared.hotkeySummary()
-        return active .. " ON / " .. assigned .. " SET"
+        local _, assigned = suite.shared.hotkeySummary()
+        return assigned .. " SET"
       end,
       activate = function(g) Screens.push(g, "HotkeySuiteInputs") end,
     })

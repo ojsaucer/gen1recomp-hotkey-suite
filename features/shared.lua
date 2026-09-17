@@ -280,7 +280,7 @@ return function(mod, suite)
     if captureInput(inputId, name, pressed, game) then return true end
     heldInputs[inputId][name] = pressed and true or nil
     for _, listener in ipairs(rawListeners[inputId]) do
-      listener(name, pressed, game, ev)
+      pcall(listener, name, pressed, game, ev)
     end
     local maxCompletedPieces = 0
     if pressed then
@@ -312,10 +312,18 @@ return function(mod, suite)
         if complete and not spec.fired and allowed
             and #spec.pieces == maxCompletedPieces then
           spec.fired = true
-          spec.onFire(game, ev)
+          local ok, err = pcall(spec.onFire, game, ev)
+          if not ok then
+            spec.fired = false
+            if mod.log and mod.log.warn then
+              mod.log:warn("Hotkey error on " .. tostring(spec.id) .. ": " .. tostring(err))
+            end
+          end
         elseif not complete and spec.fired then
           spec.fired = false
-          if spec.onBreak then spec.onBreak(game, ev) end
+          if spec.onBreak then
+            pcall(spec.onBreak, game, ev)
+          end
         end
       end
     end
@@ -412,9 +420,20 @@ return function(mod, suite)
 
   mod.hooks:wrap("input.step", function(next, game, dt)
     next(game, dt)
+    if love and love.keyboard and type(love.keyboard.isDown) == "function" then
+      for key, isHeld in pairs(heldInputs.keyboard) do
+        if isHeld then
+          local ok, down = pcall(love.keyboard.isDown, key)
+          if ok and not down then
+            dispatch("keyboard", key, false, game)
+          end
+        end
+      end
+    end
     local joystickApi = love and love.joystick
     if not joystickApi or type(joystickApi.getJoysticks) ~= "function" then return end
-    for _, joystick in ipairs(joystickApi.getJoysticks()) do
+    local joysticks = joystickApi.getJoysticks()
+    for _, joystick in ipairs(joysticks) do
       if type(joystick.getGamepadAxis) == "function" then
         triggers[joystick] = triggers[joystick]
           or { triggerleft = false, triggerright = false }
@@ -429,6 +448,25 @@ return function(mod, suite)
                 phase = "axis", axis = axis, value = value, joystick = joystick,
               })
             end
+          end
+        end
+      end
+    end
+    if #joysticks > 0 then
+      for btn, isHeld in pairs(heldInputs.gamepad) do
+        if isHeld and btn ~= "triggerleft" and btn ~= "triggerright" then
+          local downAny = false
+          for _, joystick in ipairs(joysticks) do
+            if type(joystick.isGamepadDown) == "function" then
+              local ok, down = pcall(joystick.isGamepadDown, joystick, btn)
+              if ok and down then
+                downAny = true
+                break
+              end
+            end
+          end
+          if not downAny then
+            dispatch("gamepad", btn, false, game)
           end
         end
       end
@@ -512,12 +550,18 @@ return function(mod, suite)
     while #stack.states > 1 and stack:top() ~= stack.states[1] do stack:pop() end
   end
   function shared.canOpenMenu(game)
-    if shared.context(game) ~= "overworld" then return false end
-    local base = game.stack.states[1]
+    if not game or shared.context(game) ~= "overworld" then return false end
+    local stack = game.stack
+    local states = stack and stack.states
+    if not states or #states ~= 1 then return false end
+    local base = states[1]
+    if not base then return false end
     local runner = base.runner or base.scriptRunner
     if runner and runner.isRunning and runner:isRunning() then return false end
+    local moves = base.scriptMoves
+    local hasMoves = type(moves) == "table" and #moves > 0
     return not (base.engaging or base.emote or base.teleportOut
-      or base.transitioning or #(base.scriptMoves or {}) > 0)
+      or base.transitioning or base.warping or hasMoves)
   end
   function shared.activateMenuItem(game, id)
     if not shared.canOpenMenu(game) then return false end

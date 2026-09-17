@@ -1,0 +1,367 @@
+return function(mod, suite)
+  local shared = suite.shared
+  local Font = require("src.render.Font")
+  local Screens = require("src.ui.Screens")
+  local Strings = require("src.core.Strings")
+  local Sound = require("src.core.Sound")
+  local Bag = require("src.inventory.Bag")
+  local ItemEffects = require("src.inventory.ItemEffects")
+
+  local POSITIONS = {
+    "top_left", "top_center", "top_right",
+    "center_left", "center", "center_right",
+    "bottom_left", "bottom_center", "bottom_right",
+  }
+  local POSITION_LABELS = {
+    top_left = "TOP LEFT", top_center = "TOP CENTER",
+    top_right = "TOP RIGHT", center_left = "CENTER LEFT",
+    center = "CENTER", center_right = "CENTER RIGHT",
+    bottom_left = "BOTTOM LEFT", bottom_center = "BOTTOM CENTER",
+    bottom_right = "BOTTOM RIGHT",
+  }
+  local MODES = { "menu", "quick" }
+  local MODE_LABELS = { menu = "BALL MENU", quick = "QUICK THROW" }
+  local QUICK_BALLS = { "FIRST", "POKE_BALL", "GREAT_BALL", "ULTRA_BALL", "MASTER_BALL" }
+  local QUICK_BALL_LABELS = {
+    FIRST = "FIRST IN BAG",
+    POKE_BALL = "POKE BALL",
+    GREAT_BALL = "GREAT BALL",
+    ULTRA_BALL = "ULTRA BALL",
+    MASTER_BALL = "MASTER BALL",
+  }
+
+  local function config()
+    local cfg = mod.save:get("ballMenu", {})
+    if type(cfg) ~= "table" then cfg = {} end
+    cfg.bindings = type(cfg.bindings) == "table" and cfg.bindings or {}
+    if cfg.mode ~= "menu" and cfg.mode ~= "quick" then cfg.mode = "menu" end
+    if not POSITION_LABELS[cfg.position] then cfg.position = "top_right" end
+    if not QUICK_BALL_LABELS[cfg.quickBall] then cfg.quickBall = "FIRST" end
+    return cfg
+  end
+  local function save(cfg) mod.save:set("ballMenu", cfg) end
+
+  local function battleState(game)
+    local states = game and game.stack and game.stack.states
+    for i = #(states or {}), 1, -1 do
+      local state = states[i]
+      if type(state) == "table"
+          and (state.isBattle or state.isBattleState
+            or type(state.chooseMenu) == "function") then
+        return state
+      end
+    end
+  end
+
+  local function commandReady(battle)
+    if not battle or battle.phase ~= "menu" or battle.demo then return false end
+    if battle.safari then return (battle.safari.balls or 0) > 0 end
+    local player = battle.player
+    if not player or not player.mon or player.mon.hp <= 0 then return false end
+    return true
+  end
+
+  local function isBall(id)
+    if not id then return false end
+    if ItemEffects and type(ItemEffects.isBall) == "function" then
+      local ok, res = pcall(ItemEffects.isBall, id)
+      if ok and res then return true end
+    end
+    return id == "POKE_BALL" or id == "GREAT_BALL" or id == "ULTRA_BALL"
+      or id == "MASTER_BALL" or id == "SAFARI_BALL"
+  end
+
+  local function getBallName(data, id)
+    local def = data and data.items and data.items[id]
+    local name = def and def.name or id
+    return Strings(name)
+  end
+
+  local function getAvailableBalls(battle)
+    local balls = {}
+    if not battle then return balls end
+    if battle.safari then
+      local count = battle.safari.balls or 0
+      if count > 0 then
+        balls[#balls + 1] = {
+          id = "SAFARI_BALL",
+          name = getBallName(battle.data, "SAFARI_BALL"),
+          count = count,
+        }
+      end
+      return balls
+    end
+    local saveObj = battle.game and battle.game.save
+    if not saveObj or not saveObj.inventory then return balls end
+    local order = Bag and Bag.order and Bag.order(saveObj) or saveObj.bagOrder or {}
+    local seen = {}
+    for _, id in ipairs(order) do
+      if isBall(id) and not seen[id] then
+        seen[id] = true
+        local count = saveObj.inventory[id] or 0
+        if count > 0 then
+          balls[#balls + 1] = {
+            id = id,
+            name = getBallName(battle.data, id),
+            count = count,
+          }
+        end
+      end
+    end
+    for id, count in pairs(saveObj.inventory) do
+      if isBall(id) and not seen[id] and count > 0 then
+        seen[id] = true
+        balls[#balls + 1] = {
+          id = id,
+          name = getBallName(battle.data, id),
+          count = count,
+        }
+      end
+    end
+    return balls
+  end
+
+  local function executeThrow(battle, ballId)
+    if not battle then return false end
+    if battle.safari then
+      if (battle.safari.balls or 0) <= 0 then
+        battle.phase = "messages"
+        battle.afterQueue = "menu"
+        battle:say(Strings("You're all out\nof SAFARI BALLs!"))
+        return true
+      end
+      battle:safariAction("ball")
+      return true
+    end
+    local saveObj = battle.game and battle.game.save
+    if not saveObj then return false end
+    battle.phase = "messages"
+    battle.afterQueue = "menu"
+    if not ballId or not saveObj.inventory or (saveObj.inventory[ballId] or 0) <= 0 then
+      battle:say(Strings("You're all out\nof POKé BALLs!"))
+      return true
+    end
+    if Bag and Bag.remove then
+      Bag.remove(saveObj, ballId, 1)
+    else
+      saveObj.inventory[ballId] = saveObj.inventory[ballId] - 1
+      if saveObj.inventory[ballId] <= 0 then saveObj.inventory[ballId] = nil end
+    end
+    battle:throwBall(ballId)
+    return true
+  end
+
+  local Screen = {}
+  Screen.__index = Screen
+  Screen.isOpaque = false
+
+  function Screen:sgbPalettes(game)
+    return require("src.render.PaletteFX").wholeNamed(game.data, "MEWMON")
+  end
+
+  function Screen:update()
+    local input = self.game.input
+    local count = #self.items
+    if count == 0 then
+      if input:wasPressed("a") or input:wasPressed("b") or input:wasPressed("start")
+          or input:wasPressed("select") then
+        self.game.stack:pop()
+      end
+      return
+    end
+
+    if input:wasPressed("up") then
+      self.index = self.index > 1 and self.index - 1 or count
+      if Sound and Sound.play then Sound.play(self.game.data, "Press_AB") end
+    elseif input:wasPressed("down") then
+      self.index = self.index < count and self.index + 1 or 1
+      if Sound and Sound.play then Sound.play(self.game.data, "Press_AB") end
+    elseif input:wasPressed("a") then
+      local selected = self.items[self.index]
+      self.game.stack:pop()
+      if selected and selected.id ~= "CANCEL" then
+        executeThrow(self.battle, selected.id)
+      end
+    elseif input:wasPressed("b") or input:wasPressed("start")
+        or input:wasPressed("select") then
+      self.game.stack:pop()
+    end
+  end
+
+  function Screen:draw()
+    local g = love.graphics
+    local cfg = config()
+    local items = self.items
+
+    local maxTextWidth = Font.width("CANCEL")
+    for _, item in ipairs(items) do
+      local label = item.name
+      if item.count then label = label .. " x" .. item.count end
+      maxTextWidth = math.max(maxTextWidth, Font.width(label))
+    end
+    if #items == 0 then
+      maxTextWidth = math.max(maxTextWidth, Font.width("NO POKe BALLS"))
+    end
+
+    local countRows = math.max(1, #items)
+    local tw = math.max(12, math.min(20, math.ceil((maxTextWidth + 32) / 8)))
+    local th = math.min(18, (countRows * 2) + 2)
+    local boxW, boxH = tw * 8, th * 8
+
+    local pos = cfg.position or "top_right"
+    local posX = pos:find("left", 1, true) and 0
+      or (pos:find("right", 1, true) and (160 - boxW) or math.floor((160 - boxW) / 2))
+    local posY = pos:find("top", 1, true) and 0
+      or (pos:find("bottom", 1, true) and (144 - boxH) or math.floor((144 - boxH) / 2))
+    posX = math.max(0, math.min(160 - boxW, posX))
+    posY = math.max(0, math.min(144 - boxH, posY))
+
+    local tx = math.floor(posX / 8)
+    local ty = math.floor(posY / 8)
+
+    g.push()
+    g.setColor(1, 1, 1, 1)
+    Font.drawBox(tx, ty, tw, th)
+    g.setColor(0, 0, 0, 1)
+
+    if #items == 0 then
+      Font.draw("NO POKe BALLS", posX + 16, posY + 8)
+      Font.drawCode(0xED, posX + 8, posY + 8)
+    else
+      for i, item in ipairs(items) do
+        local rowY = posY + 8 + (i - 1) * 16
+        if i == self.index then
+          Font.drawCode(0xED, posX + 8, rowY)
+        end
+        Font.draw(item.name, posX + 16, rowY)
+        if item.count then
+          local countStr = "x" .. item.count
+          local countX = posX + boxW - 8 - Font.width(countStr)
+          Font.draw(countStr, countX, rowY)
+        end
+      end
+    end
+    g.pop()
+    g.setColor(1, 1, 1, 1)
+  end
+
+  mod.content.screens:register("HotkeySuiteBallMenu", {
+    new = function(game, battle, items)
+      return setmetatable({
+        game = game, battle = battle, items = items, index = 1,
+      }, Screen)
+    end,
+  })
+
+  local function triggerBallAction(game)
+    local battle = battleState(game)
+    if not commandReady(battle) then return false end
+    local cfg = config()
+    if cfg.mode == "quick" then
+      local ballToThrow = nil
+      local available = getAvailableBalls(battle)
+      if battle.safari then
+        ballToThrow = "SAFARI_BALL"
+      elseif cfg.quickBall ~= "FIRST" then
+        local saveObj = game and game.save
+        if saveObj and saveObj.inventory and (saveObj.inventory[cfg.quickBall] or 0) > 0 then
+          ballToThrow = cfg.quickBall
+        end
+      end
+      if not ballToThrow and #available > 0 then
+        ballToThrow = available[1].id
+      end
+      return executeThrow(battle, ballToThrow)
+    else
+      local available = getAvailableBalls(battle)
+      local menuItems = {}
+      for _, item in ipairs(available) do menuItems[#menuItems + 1] = item end
+      menuItems[#menuItems + 1] = { id = "CANCEL", name = "CANCEL" }
+      Screens.push(game, "HotkeySuiteBallMenu", battle, menuItems)
+      return true
+    end
+  end
+
+  local specs = {}
+  for _, inputId in ipairs({ "keyboard", "gamepad" }) do
+    local current = inputId
+    specs[inputId] = shared.registerHotkey({
+      id = "ball_menu." .. inputId,
+      input = inputId,
+      context = "battle",
+      get = function() return config().bindings[current] end,
+      set = function(value)
+        local cfg = config()
+        cfg.bindings[current] = value or false
+        save(cfg)
+      end,
+      onFire = function(game) return triggerBallAction(game) end,
+    })
+  end
+
+  local function rows(_, inputId)
+    local spec = specs[inputId]
+    return {
+      {
+        id = "ballMenuBinding",
+        label = "HOTKEY",
+        value = function() return shared.comboLabel(spec:get()) end,
+        activate = function(game)
+          shared.captureCombo(game, "BALL HOTKEY", spec)
+        end,
+        unassign = function()
+          shared.setBinding(spec, nil)
+          return true
+        end,
+      },
+      {
+        id = "ballMenuMode",
+        label = "BEHAVIOR",
+        value = function() return MODE_LABELS[config().mode] end,
+        step = function(_, dir)
+          local cfg = config()
+          cfg.mode = shared.cycle(MODES, cfg.mode, dir)
+          save(cfg)
+          return true
+        end,
+      },
+      {
+        id = "ballMenuPosition",
+        label = "UI POSITION",
+        value = function() return POSITION_LABELS[config().position] end,
+        step = function(_, dir)
+          local cfg = config()
+          cfg.position = shared.cycle(POSITIONS, cfg.position, dir)
+          save(cfg)
+          return true
+        end,
+      },
+      {
+        id = "ballMenuQuickBall",
+        label = "QUICK BALL",
+        value = function() return QUICK_BALL_LABELS[config().quickBall] end,
+        step = function(_, dir)
+          local cfg = config()
+          cfg.quickBall = shared.cycle(QUICK_BALLS, cfg.quickBall, dir)
+          save(cfg)
+          return true
+        end,
+      },
+    }
+  end
+
+  suite.register("keyboard", {
+    id = "ball_menu", label = "BALL MENU", rows = rows,
+  })
+  suite.register("gamepad", {
+    id = "ball_menu", label = "BALL MENU", rows = rows,
+  })
+
+  shared.ballMenu = {
+    config = config,
+    executeThrow = executeThrow,
+    getAvailableBalls = getAvailableBalls,
+    specs = specs,
+    trigger = triggerBallAction,
+  }
+end
