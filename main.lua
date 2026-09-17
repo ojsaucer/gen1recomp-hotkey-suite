@@ -156,6 +156,14 @@ return function(mod)
   -- appear there without owning its own top-level row. When Kanto Ascendant
   -- is not installed, nothing reads these extra fields, so this still shows
   -- up as an ordinary Start Menu entry that opens the same settings screen.
+  --
+  -- Kanto Ascendant's own aggregator calls `item.onSelect()` with NO
+  -- arguments (its internal rows capture their own `game` reference instead
+  -- of receiving one), so `onSelect` must close over `game` from this hook
+  -- rather than expect it as a parameter. Relying on a parameter here left
+  -- `game` nil when opened through ASCENDANT, and `Screens.push(nil, ...)`
+  -- fell through to a bare `require("src.ui.HotkeySuiteInputs")`, which does
+  -- not exist as a built-in screen module.
   mod.hooks:wrap("ui.start_menu.items", function(next, game, items)
     local out = next(game, items)
     if type(out) ~= "table" then return out end
@@ -169,7 +177,7 @@ return function(mod)
         "Configure keyboard and gamepad hotkeys for Autofire Hotkeys, Menu "
         .. "Hotkeys, Radial Menu, Travel Hotkeys, Battle Command Menu, and "
         .. "Ball Menu."),
-      onSelect = function(g) Screens.push(g, "HotkeySuiteInputs") end,
+      onSelect = function() Screens.push(game, "HotkeySuiteInputs") end,
     }
     return out
   end)

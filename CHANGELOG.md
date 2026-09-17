@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.6.1] - 2026-09-17
+
+### Fixed
+
+- Selecting `HOTKEY SUITE` from `START MENU > ASCENDANT > EVENTS + TITLES`
+  crashed with `module 'src.ui.HotkeySuiteInputs' not found`. Kanto
+  Ascendant's own menu collector calls `item.onSelect()` with **no
+  arguments** (confirmed by reading its `ascendant_menu.lua`), but the entry
+  added in 1.6.0 expected `game` as a parameter, so it received `nil` and
+  `Screens.push(nil, "HotkeySuiteInputs")` fell through to a bare
+  `require("src.ui.HotkeySuiteInputs")`. `onSelect` now closes over `game`
+  from the `ui.start_menu.items` hook itself instead of expecting it as an
+  argument, matching how Kanto Ascendant's own internal rows are written.
+  Opening `HOTKEY SUITE` from `OPTIONS` was unaffected by this bug.
+
 ## [1.6.0] - 2026-09-17
 
 ### Added
