@@ -196,8 +196,8 @@ return function(mod, suite)
     }
   end
 
-  suite.register("keyboard", { id = "autofire", label = "AUTOFIRE", rows = rows })
-  suite.register("gamepad", { id = "autofire", label = "AUTOFIRE", rows = rows })
+  suite.register("keyboard", { id = "autofire", label = "AUTOFIRE HOTKEYS", rows = rows })
+  suite.register("gamepad", { id = "autofire", label = "AUTOFIRE HOTKEYS", rows = rows })
 
   shared.registerReset(function()
     local cfg = config()

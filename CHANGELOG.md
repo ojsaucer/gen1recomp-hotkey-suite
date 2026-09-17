@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.6.0] - 2026-09-17
+
+### Added
+
+- **Kanto Ascendant integration**: Hotkey Suite now adds an optional Start
+  Menu entry that Kanto Ascendant's own collector relocates into its
+  `START MENU > ASCENDANT` hub (under `EVENTS + TITLES`), matching the same
+  soft-integration contract Voxel Ascendant uses. Without Kanto Ascendant
+  installed, the entry simply behaves as an ordinary Start Menu row that
+  opens the same Hotkey Suite settings screen.
+
+### Changed
+
+- Renamed the `AUTOFIRE` module to `AUTOFIRE HOTKEYS` for consistency with
+  the rest of the suite's module names.
+
+### Fixed
+
+- Menu Hotkeys and the Radial Menu can once again open a *different* menu
+  immediately after one is already open, without first backing all the way
+  out to the overworld. The v1.4.0 crash hardening had tightened
+  `canOpenMenu` to require an empty screen stack, which unintentionally
+  blocked the existing "swap menus" flow (`closeMenus` popping the old menu
+  before the new one opens); the nil-safety hardening is kept, but the
+  empty-stack requirement is removed.
+- The Ball Menu's single-line selector box and its text now align exactly.
+  The border was snapped to the 8px tile grid while the text used the
+  original unsnapped pixel position, so any position other than a flush
+  top/bottom edge (including the default centering math) could draw the
+  border a few pixels away from the text. The border now draws at the same
+  pixel-exact position as the text, the same fix already applied to the
+  Radial Menu's highlight box.
+
 ## [1.5.0] - 2026-09-17
 
 ### Added

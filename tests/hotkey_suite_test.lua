@@ -125,6 +125,10 @@ end
 
 local afRows = ex.features.keyboard[1].rows({}, "keyboard")
 T.neq(afRows[#afRows].unassign, nil, "hotkey rows expose SELECT-to-unassign")
+T.eq(ex.features.keyboard[1].label, "AUTOFIRE HOTKEYS",
+  "autofire module is labeled Autofire Hotkeys")
+T.eq(ex.features.gamepad[1].label, "AUTOFIRE HOTKEYS",
+  "gamepad autofire module is labeled Autofire Hotkeys")
 
 local menuSpec = ex.shared.menuHotkeys.ensureSpec("keyboard", "pokedex")
 T.eq(ex.shared.bindingAllowed("gamepad", {
@@ -219,6 +223,33 @@ T.eq(ex.shared.context({ stack = { states = { { isOverworld = true } } } }),
 T.eq(ex.shared.context({ stack = { states = {
   { isOverworld = true }, { screenId = "BattleMenu" },
 } } }), "battle", "battle overlays override the overworld context")
+
+local overworldBase = { isOverworld = true }
+T.eq(ex.shared.canOpenMenu({ stack = { states = { overworldBase } } }), true,
+  "canOpenMenu allows opening a menu from a clear overworld base")
+T.eq(ex.shared.canOpenMenu({ stack = { states = {
+  overworldBase, { screenId = "PartyMenu" },
+} } }), true,
+  "canOpenMenu still allows swapping to a new menu while one is already open")
+T.eq(ex.shared.canOpenMenu({ stack = { states = {
+  { isOverworld = true, engaging = true }, { screenId = "PartyMenu" },
+} } }), false,
+  "canOpenMenu still blocks while the base screen is mid-cutscene")
+T.eq(ex.shared.canOpenMenu({ stack = { states = {} } }), false,
+  "canOpenMenu is nil-safe against an empty stack")
+
+local ascendantItems = Runtime.call("ui.start_menu.items",
+  function(_, value) return value end, {}, {})
+local ascendantEntry
+for _, item in ipairs(ascendantItems) do
+  if item.id == "hotkey_suite_ascendant" then ascendantEntry = item end
+end
+T.neq(ascendantEntry, nil,
+  "an Ascendant-flagged Start Menu entry is registered")
+T.eq(ascendantEntry and ascendantEntry.ascendantMenu, true,
+  "the Ascendant entry is flagged for Kanto Ascendant's collector")
+T.eq(type(ascendantEntry and ascendantEntry.onSelect), "function",
+  "the Ascendant entry opens the Hotkey Suite settings screen")
 
 local passthroughCalls, hotkeyCalls = 0, 0
 local testBinding = { { input = "keyboard", name = "a" } }

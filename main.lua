@@ -150,6 +150,30 @@ return function(mod)
     })
   end)
 
+  -- Kanto Ascendant relocates any Start Menu item flagged `ascendantMenu`
+  -- into its own START MENU > ASCENDANT hub (see its ascendant_menu.lua
+  -- collector), the same soft-integration contract Voxel Ascendant uses to
+  -- appear there without owning its own top-level row. When Kanto Ascendant
+  -- is not installed, nothing reads these extra fields, so this still shows
+  -- up as an ordinary Start Menu entry that opens the same settings screen.
+  mod.hooks:wrap("ui.start_menu.items", function(next, game, items)
+    local out = next(game, items)
+    if type(out) ~= "table" then return out end
+    out[#out + 1] = {
+      id = "hotkey_suite_ascendant",
+      label = Strings("HOTKEY SUITE"),
+      ascendantMenu = true,
+      ascendantLabel = Strings("HOTKEY SUITE"),
+      ascendantGroup = "events",
+      ascendantHelp = Strings(
+        "Configure keyboard and gamepad hotkeys for Autofire Hotkeys, Menu "
+        .. "Hotkeys, Radial Menu, Travel Hotkeys, Battle Command Menu, and "
+        .. "Ball Menu."),
+      onSelect = function(g) Screens.push(g, "HotkeySuiteInputs") end,
+    }
+    return out
+  end)
+
   mod.exports.registerFeature = suite.register
   mod.exports.features = suite.features
   mod.exports.shared = suite.shared

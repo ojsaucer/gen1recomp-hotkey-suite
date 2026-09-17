@@ -16,7 +16,7 @@ Configure everything from one menu:
 
 Each module below has its own **ENABLED** master switch (**OFF** by default).
 
-### ⚡ Autofire
+### ⚡ Autofire Hotkeys
 - **Toggle or Hold** activation with 5 adjustable repeat speeds.
 - Supports **Fixed Target** (any Game Boy button) or **Next Input** mode.
 - Optional on-screen HUD status indicator with customizable position.
@@ -25,6 +25,7 @@ Each module below has its own **ENABLED** master switch (**OFF** by default).
 - **Instant Shortcuts:** Bind any START-menu option to single buttons or multi-key combos (up to 4 inputs).
 - **Dynamic Mod Discovery:** Automatically finds and binds menu tabs added by other mods (such as Kanto Ascendant).
 - **Radial Wheel:** Hold a hotkey, point either analog stick, and release to select. Includes 9 screen anchor positions.
+- **Swap Without Backing Out:** Opening a different menu hotkey closes whatever menu is currently open first, so you can jump straight from one menu to another.
 
 ### 🚲 Travel Hotkeys (Overworld)
 - **Fly:** Instant Town Map flight when HM02 is in your Bag.
@@ -51,6 +52,12 @@ Each module below has its own **ENABLED** master switch (**OFF** by default).
 - **Smart Conflict Resolution:** Exact duplicate bindings auto-evict older assignments. Chord modifiers (e.g. `RT+Y`) take priority without misfiring single-button hotkeys (`Y`).
 - **Quick Unassign:** Press **Select** or **Start** on any option to clear its binding, or use **Unassign All** to reset every module back to OFF and unbound.
 - **Context-Aware:** Menu and travel hotkeys only fire in the overworld; battle hotkeys only fire during battle.
+
+---
+
+## Compatibility
+
+- **Kanto Ascendant:** If installed, Hotkey Suite adds an item to `START MENU > ASCENDANT` (under `EVENTS + TITLES`) that opens these same settings. Without Kanto Ascendant, that same entry simply appears as an ordinary Start Menu row.
 
 ---
 

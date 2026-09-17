@@ -9,12 +9,13 @@ return {
     },
     added = {
       "every module carries an ENABLED master switch that ships OFF with no hotkey bound",
-      "keyboard/gamepad autofire and menu hotkeys",
+      "keyboard/gamepad autofire hotkeys and menu hotkeys",
       "gamepad radial menu with either-stick selection and LT/RT-capable binding",
       "keyboard and gamepad travel shortcuts for Fly, Pokemon Center return, and Bicycle",
       "battle command, instant-Run, and auto battle text advance for keyboard and gamepad",
       "a single-line battle ball selector with a quick-throw alternative",
       "confirmed suite-wide unassignment and configurable radial placement",
+      "an optional Start Menu entry that Kanto Ascendant relocates into its own ASCENDANT hub when installed",
       "a feature registry for adding future accessibility modules without rebuilding the menu hierarchy",
     },
     known = {

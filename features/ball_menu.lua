@@ -196,6 +196,31 @@ return function(mod, suite)
     love.graphics.pop()
   end
 
+  -- Pixel-exact border, matching the radial menu's fix for the same class of
+  -- bug: Font.drawBox snaps to the 8px tile grid, which can land a few
+  -- pixels away from a position computed as a float (e.g. a centered box).
+  -- Text was already drawn at the unsnapped pixel position, so the two
+  -- disagreed. Drawing the border at the same float position keeps both in
+  -- sync regardless of which of the 9 positions is selected.
+  local function drawBox(x, y, w, h)
+    local g = love.graphics
+    local r, green, b, a = g.getColor()
+    g.setColor(1, 1, 1, 1)
+    g.rectangle("fill", x, y, w, h)
+    g.setColor(r, green, b, a)
+    local border = Font.BORDER
+    Font.drawCode(border.tl, x, y)
+    Font.drawCode(border.tr, x + w - 8, y)
+    Font.drawCode(border.bl, x, y + h - 8)
+    Font.drawCode(border.br, x + w - 8, y + h - 8)
+    for dx = 8, w - 16, 8 do
+      Font.drawCode(border.h, x + dx, y)
+      Font.drawCode(border.h, x + dx, y + h - 8)
+    end
+    Font.drawCode(border.v, x, y + 8)
+    Font.drawCode(border.v, x + w - 8, y + 8)
+  end
+
   -- One row only. The selector expands horizontally instead of listing every
   -- ball vertically, so replacement battle UIs keep their own screen space.
   function Screen:draw()
@@ -231,7 +256,7 @@ return function(mod, suite)
 
     g.push()
     g.setColor(1, 1, 1, 1)
-    Font.drawBox(math.floor(posX / 8), math.floor(posY / 8), tw, th)
+    drawBox(posX, posY, boxW, boxH)
     g.setColor(0, 0, 0, 1)
 
     local textY = posY + 8

@@ -569,12 +569,15 @@ return function(mod, suite)
     if not stack or not stack.states then return end
     while #stack.states > 1 and stack:top() ~= stack.states[1] do stack:pop() end
   end
+  -- Only the base overworld screen's own flags gate opening a menu here.
+  -- Requiring an empty stack on top of it would also block *switching*
+  -- between two already-open menus (closeMenus() is what pops the old one),
+  -- so this only confirms the base screen itself is safe to act on.
   function shared.canOpenMenu(game)
     if not game or shared.context(game) ~= "overworld" then return false end
     local stack = game.stack
     local states = stack and stack.states
-    if not states or #states ~= 1 then return false end
-    local base = states[1]
+    local base = states and states[1]
     if not base then return false end
     local runner = base.runner or base.scriptRunner
     if runner and runner.isRunning and runner:isRunning() then return false end
