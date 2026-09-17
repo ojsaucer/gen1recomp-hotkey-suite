@@ -33,6 +33,7 @@ return function(mod, suite)
   local function config()
     local cfg = mod.save:get("ballMenu", {})
     if type(cfg) ~= "table" then cfg = {} end
+    if cfg.enabled == nil then cfg.enabled = false end
     cfg.bindings = type(cfg.bindings) == "table" and cfg.bindings or {}
     if cfg.mode ~= "menu" and cfg.mode ~= "quick" then cfg.mode = "menu" end
     if not POSITION_LABELS[cfg.position] then cfg.position = "top_right" end
@@ -170,42 +171,54 @@ return function(mod, suite)
       return
     end
 
-    if input:wasPressed("up") then
-      self.index = self.index > 1 and self.index - 1 or count
-      if Sound and Sound.play then Sound.play(self.game.data, "Press_AB") end
-    elseif input:wasPressed("down") then
-      self.index = self.index < count and self.index + 1 or 1
+    local step = 0
+    if input:wasPressed("left") or input:wasPressed("up") then step = -1
+    elseif input:wasPressed("right") or input:wasPressed("down") then step = 1 end
+
+    if step ~= 0 then
+      self.index = ((self.index - 1 + step) % count) + 1
       if Sound and Sound.play then Sound.play(self.game.data, "Press_AB") end
     elseif input:wasPressed("a") then
       local selected = self.items[self.index]
       self.game.stack:pop()
-      if selected and selected.id ~= "CANCEL" then
-        executeThrow(self.battle, selected.id)
-      end
+      if selected then executeThrow(self.battle, selected.id) end
     elseif input:wasPressed("b") or input:wasPressed("start")
         or input:wasPressed("select") then
       self.game.stack:pop()
     end
   end
 
+  local function drawArrow(x, y, flipped)
+    love.graphics.push()
+    love.graphics.translate(x + 4, y + 4)
+    if flipped then love.graphics.rotate(math.pi) end
+    Font.drawCode(0xED, -4, -4)
+    love.graphics.pop()
+  end
+
+  -- One row only. The selector expands horizontally instead of listing every
+  -- ball vertically, so replacement battle UIs keep their own screen space.
   function Screen:draw()
     local g = love.graphics
     local cfg = config()
     local items = self.items
+    local multiple = #items > 1
 
-    local maxTextWidth = Font.width("CANCEL")
+    local maxTextWidth = 0
     for _, item in ipairs(items) do
-      local label = item.name
-      if item.count then label = label .. " x" .. item.count end
-      maxTextWidth = math.max(maxTextWidth, Font.width(label))
+      local width = Font.width(item.name)
+      if item.count then width = width + 8 + Font.width("x" .. item.count) end
+      maxTextWidth = math.max(maxTextWidth, width)
     end
     if #items == 0 then
-      maxTextWidth = math.max(maxTextWidth, Font.width("NO POKe BALLS"))
+      maxTextWidth = math.max(maxTextWidth, Font.width("NO BALLS"))
     end
 
-    local countRows = math.max(1, #items)
-    local tw = math.max(12, math.min(20, math.ceil((maxTextWidth + 32) / 8)))
-    local th = math.min(18, (countRows * 2) + 2)
+    -- 8px border each side, plus an 8px arrow gutter each side when cycling.
+    local gutter = multiple and 16 or 0
+    local tw = math.max(10, math.min(20,
+      math.ceil((maxTextWidth + gutter + 16) / 8)))
+    local th = 3
     local boxW, boxH = tw * 8, th * 8
 
     local pos = cfg.position or "top_right"
@@ -216,29 +229,26 @@ return function(mod, suite)
     posX = math.max(0, math.min(160 - boxW, posX))
     posY = math.max(0, math.min(144 - boxH, posY))
 
-    local tx = math.floor(posX / 8)
-    local ty = math.floor(posY / 8)
-
     g.push()
     g.setColor(1, 1, 1, 1)
-    Font.drawBox(tx, ty, tw, th)
+    Font.drawBox(math.floor(posX / 8), math.floor(posY / 8), tw, th)
     g.setColor(0, 0, 0, 1)
 
+    local textY = posY + 8
     if #items == 0 then
-      Font.draw("NO POKe BALLS", posX + 16, posY + 8)
-      Font.drawCode(0xED, posX + 8, posY + 8)
+      Font.draw("NO BALLS", posX + 8, textY)
     else
-      for i, item in ipairs(items) do
-        local rowY = posY + 8 + (i - 1) * 16
-        if i == self.index then
-          Font.drawCode(0xED, posX + 8, rowY)
-        end
-        Font.draw(item.name, posX + 16, rowY)
-        if item.count then
-          local countStr = "x" .. item.count
-          local countX = posX + boxW - 8 - Font.width(countStr)
-          Font.draw(countStr, countX, rowY)
-        end
+      local item = items[self.index]
+      local left = posX + 8 + (multiple and 8 or 0)
+      Font.draw(item.name, left, textY)
+      if item.count then
+        local countStr = "x" .. item.count
+        Font.draw(countStr,
+          posX + boxW - 8 - (multiple and 8 or 0) - Font.width(countStr), textY)
+      end
+      if multiple then
+        drawArrow(posX + 8, textY, true)
+        drawArrow(posX + boxW - 16, textY, false)
       end
     end
     g.pop()
@@ -254,12 +264,13 @@ return function(mod, suite)
   })
 
   local function triggerBallAction(game)
+    local cfg = config()
+    if not cfg.enabled then return false end
     local battle = battleState(game)
     if not commandReady(battle) then return false end
-    local cfg = config()
+    local available = getAvailableBalls(battle)
     if cfg.mode == "quick" then
       local ballToThrow = nil
-      local available = getAvailableBalls(battle)
       if battle.safari then
         ballToThrow = "SAFARI_BALL"
       elseif cfg.quickBall ~= "FIRST" then
@@ -272,14 +283,9 @@ return function(mod, suite)
         ballToThrow = available[1].id
       end
       return executeThrow(battle, ballToThrow)
-    else
-      local available = getAvailableBalls(battle)
-      local menuItems = {}
-      for _, item in ipairs(available) do menuItems[#menuItems + 1] = item end
-      menuItems[#menuItems + 1] = { id = "CANCEL", name = "CANCEL" }
-      Screens.push(game, "HotkeySuiteBallMenu", battle, menuItems)
-      return true
     end
+    Screens.push(game, "HotkeySuiteBallMenu", battle, available)
+    return true
   end
 
   local specs = {}
@@ -289,6 +295,7 @@ return function(mod, suite)
       id = "ball_menu." .. inputId,
       input = inputId,
       context = "battle",
+      enabled = function() return config().enabled end,
       get = function() return config().bindings[current] end,
       set = function(value)
         local cfg = config()
@@ -302,6 +309,13 @@ return function(mod, suite)
   local function rows(_, inputId)
     local spec = specs[inputId]
     return {
+      shared.enabledRow("ballMenu.enabled",
+        function() return config().enabled end,
+        function(value)
+          local cfg = config()
+          cfg.enabled = value
+          save(cfg)
+        end),
       {
         id = "ballMenuBinding",
         label = "HOTKEY",
@@ -356,6 +370,12 @@ return function(mod, suite)
   suite.register("gamepad", {
     id = "ball_menu", label = "BALL MENU", rows = rows,
   })
+
+  shared.registerReset(function()
+    local cfg = config()
+    cfg.enabled = false
+    save(cfg)
+  end)
 
   shared.ballMenu = {
     config = config,

@@ -31,6 +31,7 @@ return function(mod, suite)
   local function config()
     local cfg = mod.save:get("autofire", {})
     if type(cfg) ~= "table" then cfg = {} end
+    if cfg.enabled == nil then cfg.enabled = false end
     if cfg.mode ~= "toggle" and cfg.mode ~= "hold" then cfg.mode = "toggle" end
     if cfg.method ~= "fixed" and cfg.method ~= "next" then cfg.method = "fixed" end
     cfg.speed = tonumber(cfg.speed)
@@ -71,6 +72,7 @@ return function(mod, suite)
       id = "autofire." .. inputId,
       input = inputId,
       context = "any",
+      enabled = function() return config().enabled end,
       get = function() return config().bindings[currentInput] end,
       set = function(value)
         local cfg = config()
@@ -91,6 +93,7 @@ return function(mod, suite)
 
     shared.onRaw(inputId, function(name, pressed, game)
       local cfg = config()
+      if not cfg.enabled then return false end
       if cfg.method ~= "next" or state.selector ~= currentInput then return false end
       local target = mapped(game, currentInput, name)
       if not target or not LABEL[target] then return false end
@@ -110,6 +113,10 @@ return function(mod, suite)
     next(game, dt)
     if not state.active then return end
     local cfg = config()
+    if not cfg.enabled then
+      stop()
+      return
+    end
     state.accumulator = state.accumulator + dt
     local interval = 1 / SPEEDS[cfg.speed].rate
     while state.accumulator >= interval do
@@ -160,6 +167,14 @@ return function(mod, suite)
     local noticeStep, noticeValue = cycle("notice", NOTICES, NOTICE_LABEL)
     local spec = specs[inputId]
     return {
+      shared.enabledRow("afEnabled",
+        function() return config().enabled end,
+        function(value)
+          local cfg = config()
+          cfg.enabled = value
+          save(cfg)
+          if not value then stop() end
+        end),
       { id = "afMethod", label = "METHOD", value = methodValue, step = methodStep },
       { id = "afMode", label = "MODE", value = modeValue, step = modeStep },
       { id = "afSpeed", label = "SPEED",
@@ -183,6 +198,14 @@ return function(mod, suite)
 
   suite.register("keyboard", { id = "autofire", label = "AUTOFIRE", rows = rows })
   suite.register("gamepad", { id = "autofire", label = "AUTOFIRE", rows = rows })
+
+  shared.registerReset(function()
+    local cfg = config()
+    cfg.enabled = false
+    save(cfg)
+    stop()
+  end)
+
   shared.autofire = {
     config = config, save = save, state = state, stop = stop,
     speeds = SPEEDS, targets = TARGETS, labels = LABEL, start = start,

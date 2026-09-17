@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.5.0] - 2026-09-17
+
+### Added
+
+- Every module now carries an `ENABLED` master switch as its first setting.
+  All six modules ship **OFF**, so a fresh install never reacts to input.
+- **Auto Text** for the Battle Command Menu: automatically advances battle
+  messages with a `SLOW` / `MEDIUM` / `FAST` / `VERY FAST` `TEXT SPEED` setting.
+  It only advances settled battle messages, so menus, move selection, and
+  yes/no prompts stay under manual control.
+
+### Changed
+
+- Renamed the `BATTLE HOTKEYS` module to `BATTLE CMD MENU` (Battle Command
+  Menu); its feature id is now `command_menu`.
+- The ball selector is now a single line. Left/Right cycles ball types, `A`
+  throws, and `B` cancels, so it no longer covers replacement battle UIs.
+- `UNASSIGN ALL` now also returns every module to `OFF`, so no module can be
+  left switched on with nothing bound.
+- Documentation now states up front that all modules and hotkeys start off.
+
+### Fixed
+
+- A module master switch is now honored by the input broker itself. Previously
+  a switch could read `ON` while the module did nothing, which is what made
+  the radial menu look enabled on a fresh save.
+
 ## [1.4.0] - 2026-09-17
 
 ### Added

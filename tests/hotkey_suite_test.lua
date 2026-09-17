@@ -15,12 +15,12 @@ T.eq(#ex.features.gamepad, 6, "gamepad includes radial, travel, battle, and ball
 
 local expected = {
   keyboard = {
-    autofire = true, menu_hotkeys = true, travel = true, battle_hotkeys = true,
+    autofire = true, menu_hotkeys = true, travel = true, command_menu = true,
     ball_menu = true,
   },
   gamepad = {
     autofire = true, menu_hotkeys = true, radial = true, travel = true,
-    battle_hotkeys = true, ball_menu = true,
+    command_menu = true, ball_menu = true,
   },
 }
 for inputId, wanted in pairs(expected) do
@@ -47,14 +47,19 @@ T.neq(settings.sgbPalettes, nil,
   "custom settings screen implements the renderer palette contract")
 
 local af = ex.shared.autofire
+T.eq(af.config().enabled, false, "autofire module starts disabled")
 T.eq(af.config().mode, "toggle", "autofire defaults to toggle")
 T.eq(af.config().target, "a", "autofire defaults to A")
 T.eq(af.config().speed, 2, "missing autofire speed is normalized and assigned")
 T.eq(af.speeds[af.config().speed].rate, 10, "autofire defaults to 10/s")
 T.eq(af.specs.keyboard:get(), nil, "keyboard autofire starts unbound")
 T.eq(af.specs.gamepad:get(), nil, "gamepad autofire starts unbound")
+T.eq(ex.shared.menuHotkeys.isEnabled(), false,
+  "menu hotkeys module starts disabled")
+T.eq(ex.shared.travel.config().enabled, false,
+  "travel module starts disabled")
 T.eq(ex.shared.radial.spec:get(), nil, "radial menu starts unbound")
-T.eq(ex.shared.radial.config().enabled, true, "radial menu defaults on")
+T.eq(ex.shared.radial.config().enabled, false, "radial menu starts disabled")
 T.eq(ex.shared.radial.config().position, "center",
   "radial menu defaults to center")
 for _, inputId in ipairs({ "keyboard", "gamepad" }) do
@@ -62,39 +67,62 @@ for _, inputId in ipairs({ "keyboard", "gamepad" }) do
     T.eq(ex.shared.travel.specs[inputId][actionId]:get(), nil,
       inputId .. " " .. actionId .. " starts unbound")
   end
-  T.eq(ex.shared.battleHotkeys.specs.commands[inputId]:get(), nil,
+  T.eq(ex.shared.commandMenu.specs.commands[inputId]:get(), nil,
     inputId .. " battle command mode starts unbound")
-  T.eq(ex.shared.battleHotkeys.specs.run[inputId]:get(), nil,
+  T.eq(ex.shared.commandMenu.specs.run[inputId]:get(), nil,
     inputId .. " instant run starts unbound")
 end
-T.eq(ex.shared.battleHotkeys.config().legendPosition, "top_center",
+T.eq(ex.shared.commandMenu.config().enabled, false,
+  "battle command menu module starts disabled")
+T.eq(ex.shared.commandMenu.config().autoText, false,
+  "auto text skip starts off")
+T.eq(ex.shared.commandMenu.autoTextSpeeds[
+  ex.shared.commandMenu.config().autoTextSpeed].label, "MEDIUM",
+  "auto text skip defaults to medium speed")
+T.eq(ex.shared.commandMenu.textWaiting({ stack = { top = function() end } }, nil),
+  false, "auto text skip ignores a missing battle")
+T.eq(ex.shared.commandMenu.config().legendPosition, "top_center",
   "custom battle UI legend defaults to top center")
-T.eq(ex.shared.battleHotkeys.config().legendScale, 1,
+T.eq(ex.shared.commandMenu.config().legendScale, 1,
   "custom battle UI legend defaults to 100 percent")
-T.eq(ex.shared.battleHotkeys.commands.up.action, "fight",
+T.eq(ex.shared.commandMenu.commands.up.action, "fight",
   "UP maps to the top-left FIGHT command")
-T.eq(ex.shared.battleHotkeys.commands.right.action, "party",
+T.eq(ex.shared.commandMenu.commands.right.action, "party",
   "RIGHT maps to the top-right PKMN command")
-T.eq(ex.shared.battleHotkeys.commands.left.action, "item",
+T.eq(ex.shared.commandMenu.commands.left.action, "item",
   "LEFT maps to the bottom-left ITEM command")
-T.eq(ex.shared.battleHotkeys.commands.down.action, "run",
+T.eq(ex.shared.commandMenu.commands.down.action, "run",
   "DOWN maps to the bottom-right RUN command")
-T.eq(ex.shared.battleHotkeys.customBattleUI({
+T.eq(ex.shared.commandMenu.customBattleUI({
   bottomUIVisible = function() return false end,
 }), true, "hidden native battle UI identifies a custom UI owner")
-T.eq(ex.shared.battleHotkeys.customBattleUI({
+T.eq(ex.shared.commandMenu.customBattleUI({
   bottomUIVisible = function() return true end,
 }), false, "visible native battle UI keeps native arrow placement")
 T.eq(ex.shared.ballMenu.specs.keyboard:get(), nil,
   "keyboard ball menu starts unbound")
 T.eq(ex.shared.ballMenu.specs.gamepad:get(), nil,
   "gamepad ball menu starts unbound")
+T.eq(ex.shared.ballMenu.config().enabled, false,
+  "ball menu module starts disabled")
 T.eq(ex.shared.ballMenu.config().mode, "menu",
   "ball menu defaults to menu mode")
 T.eq(ex.shared.ballMenu.config().position, "top_right",
   "ball menu defaults to top right position")
 T.eq(ex.shared.ballMenu.config().quickBall, "FIRST",
   "ball menu quick ball defaults to first in bag")
+
+-- Every module leads with its master switch, and it reads OFF on a fresh save.
+for _, inputId in ipairs({ "keyboard", "gamepad" }) do
+  for _, feature in ipairs(ex.features[inputId]) do
+    local featureRows = feature.rows({}, inputId)
+    T.eq(featureRows[1].label, "ENABLED",
+      inputId .. " " .. feature.id .. " leads with a master switch")
+    T.eq(featureRows[1].value(), "OFF",
+      inputId .. " " .. feature.id .. " starts off")
+  end
+end
+
 local afRows = ex.features.keyboard[1].rows({}, "keyboard")
 T.neq(afRows[#afRows].unassign, nil, "hotkey rows expose SELECT-to-unassign")
 

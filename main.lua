@@ -133,7 +133,7 @@ return function(mod)
   suite.load("features/menu_hotkeys.lua")
   suite.load("features/radial.lua")
   suite.load("features/travel.lua")
-  suite.load("features/battle_hotkeys.lua")
+  suite.load("features/command_menu.lua")
   suite.load("features/ball_menu.lua")
 
   mod.hooks:wrap("ui.options.rows", function(next, game, rows)

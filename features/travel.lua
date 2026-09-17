@@ -11,6 +11,7 @@ return function(mod, suite)
   local function config()
     local cfg = mod.save:get("travel", {})
     if type(cfg) ~= "table" then cfg = {} end
+    if cfg.enabled == nil then cfg.enabled = false end
     cfg.bindings = type(cfg.bindings) == "table" and cfg.bindings or {}
     cfg.bindings.keyboard = type(cfg.bindings.keyboard) == "table"
       and cfg.bindings.keyboard or {}
@@ -90,6 +91,7 @@ return function(mod, suite)
         id = "travel." .. inputId .. "." .. action.id,
         input = inputId,
         context = "overworld",
+        enabled = function() return config().enabled end,
         get = function()
           return config().bindings[currentInput][currentAction.id]
         end,
@@ -104,7 +106,15 @@ return function(mod, suite)
   end
 
   local function rows(_, inputId)
-    local rows = {}
+    local rows = {
+      shared.enabledRow("travel.enabled",
+        function() return config().enabled end,
+        function(value)
+          local cfg = config()
+          cfg.enabled = value
+          save(cfg)
+        end),
+    }
     for _, action in ipairs(ACTIONS) do
       local current = action
       local spec = specs[inputId][current.id]
@@ -127,6 +137,12 @@ return function(mod, suite)
   suite.register("gamepad", {
     id = "travel", label = "TRAVEL HOTKEYS", rows = rows,
   })
+
+  shared.registerReset(function()
+    local cfg = config()
+    cfg.enabled = false
+    save(cfg)
+  end)
 
   shared.travel = {
     actions = ACTIONS,

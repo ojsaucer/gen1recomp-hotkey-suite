@@ -31,11 +31,24 @@ return function(mod, suite)
     bottom_center = "BOTTOM CENTER", bottom_right = "BOTTOM RIGHT",
   }
   local LEGEND_SCALES = { 0.75, 1, 1.25, 1.5 }
+  local AUTO_TEXT_SPEEDS = {
+    { label = "SLOW", delay = 0.70 },
+    { label = "MEDIUM", delay = 0.45 },
+    { label = "FAST", delay = 0.25 },
+    { label = "VERY FAST", delay = 0.12 },
+  }
 
   local function config()
     local cfg = mod.save:get("battleHotkeys", {})
     if type(cfg) ~= "table" then cfg = {} end
+    if cfg.enabled == nil then cfg.enabled = false end
     cfg.bindings = type(cfg.bindings) == "table" and cfg.bindings or {}
+    if cfg.autoText == nil then cfg.autoText = false end
+    cfg.autoTextSpeed = tonumber(cfg.autoTextSpeed)
+    if not cfg.autoTextSpeed or cfg.autoTextSpeed % 1 ~= 0
+        or not AUTO_TEXT_SPEEDS[cfg.autoTextSpeed] then
+      cfg.autoTextSpeed = 2
+    end
     if not LEGEND_POSITION_LABELS[cfg.legendPosition] then
       cfg.legendPosition = "top_center"
     end
@@ -131,6 +144,7 @@ return function(mod, suite)
       id = "battle.commands." .. inputId,
       input = inputId,
       context = "battle",
+      enabled = function() return config().enabled end,
       get = function() return config().bindings[current] end,
       set = function(value)
         local cfg = config()
@@ -145,6 +159,7 @@ return function(mod, suite)
       id = "battle.run." .. inputId,
       input = inputId,
       context = "battle",
+      enabled = function() return config().enabled end,
       get = function() return config().bindings[current .. "Run"] end,
       set = function(value)
         local cfg = config()
@@ -158,6 +173,10 @@ return function(mod, suite)
   for _, inputId in ipairs({ "keyboard", "gamepad" }) do
     local current = inputId
     shared.onRaw(inputId, function(name, pressed, game)
+      if not config().enabled then
+        active[current] = false
+        return
+      end
       local direction = DIRECTIONS[name]
       if pressed and active[current] and direction then
         local battle = battleState(game)
@@ -177,6 +196,46 @@ return function(mod, suite)
     Font.drawCode(0xED, -4, -4)
     love.graphics.pop()
   end
+
+  -- Auto Text Skip taps the same A the player would press, and only while the
+  -- battle itself is the top state and is parked on a message waiting for
+  -- input. Choice prompts (yes/no, nickname, learn-move) push their own screen
+  -- on top, so they stay under manual control.
+  local autoText = { accumulator = 0 }
+
+  local function textWaiting(game, battle)
+    if not battle then return false end
+    if battle.demo then return false end
+    local stack = game and game.stack
+    if not stack or type(stack.top) ~= "function" then return false end
+    if stack:top() ~= battle then return false end
+    if battle.phase == "menu" or battle.phase == "moveSelect"
+        or battle.phase == "mimicSelect" then
+      return false
+    end
+    return battle.msgWaiting == true or battle.msgPrompt == true
+      or battle.waitingForInput == true
+  end
+
+  mod.hooks:wrap("input.step", function(next, game, dt)
+    next(game, dt)
+    local cfg = config()
+    if not cfg.enabled or not cfg.autoText then
+      autoText.accumulator = 0
+      return
+    end
+    local battle = battleState(game)
+    if not textWaiting(game, battle) then
+      autoText.accumulator = 0
+      return
+    end
+    autoText.accumulator = autoText.accumulator + (dt or 0)
+    local delay = AUTO_TEXT_SPEEDS[cfg.autoTextSpeed].delay
+    if autoText.accumulator >= delay then
+      autoText.accumulator = 0
+      mod.input:tap(game, "a")
+    end
+  end)
 
   local function legendLabels(battle)
     if commandReady(battle) then
@@ -328,6 +387,17 @@ return function(mod, suite)
     local commandSpec = specs.commands[inputId]
     local runSpec = specs.run[inputId]
     return {
+      shared.enabledRow("battle.enabled",
+        function() return config().enabled end,
+        function(value)
+          local cfg = config()
+          cfg.enabled = value
+          save(cfg)
+          if not value then
+            active.keyboard, active.gamepad = false, false
+            autoText.accumulator = 0
+          end
+        end),
       {
         id = "battle.commands.binding",
         label = "CMD MODE",
@@ -351,6 +421,39 @@ return function(mod, suite)
         end,
         unassign = function()
           shared.setBinding(runSpec, nil)
+          return true
+        end,
+      },
+      {
+        id = "battle.autoText",
+        label = "AUTO TEXT",
+        value = function() return config().autoText and "ON" or "OFF" end,
+        step = function()
+          local cfg = config()
+          cfg.autoText = not cfg.autoText
+          save(cfg)
+          autoText.accumulator = 0
+          return true
+        end,
+        unassign = function()
+          local cfg = config()
+          cfg.autoText = false
+          save(cfg)
+          autoText.accumulator = 0
+          return true
+        end,
+      },
+      {
+        id = "battle.autoTextSpeed",
+        label = "TEXT SPEED",
+        value = function()
+          return AUTO_TEXT_SPEEDS[config().autoTextSpeed].label
+        end,
+        step = function(_, dir)
+          local cfg = config()
+          cfg.autoTextSpeed = ((cfg.autoTextSpeed - 1 + (dir or 1))
+            % #AUTO_TEXT_SPEEDS) + 1
+          save(cfg)
           return true
         end,
       },
@@ -386,14 +489,24 @@ return function(mod, suite)
   end
 
   suite.register("keyboard", {
-    id = "battle_hotkeys", label = "BATTLE HOTKEYS", rows = rows,
+    id = "command_menu", label = "BATTLE CMD MENU", rows = rows,
   })
   suite.register("gamepad", {
-    id = "battle_hotkeys", label = "BATTLE HOTKEYS", rows = rows,
+    id = "command_menu", label = "BATTLE CMD MENU", rows = rows,
   })
 
-  shared.battleHotkeys = {
+  shared.registerReset(function()
+    local cfg = config()
+    cfg.enabled = false
+    cfg.autoText = false
+    save(cfg)
+    active.keyboard, active.gamepad = false, false
+    autoText.accumulator = 0
+  end)
+
+  shared.commandMenu = {
     active = active,
+    autoTextSpeeds = AUTO_TEXT_SPEEDS,
     choose = choose,
     chooseMove = chooseMove,
     config = config,
@@ -402,5 +515,7 @@ return function(mod, suite)
     commands = COMMANDS,
     runFromMenu = runFromMenu,
     specs = specs,
+    textWaiting = textWaiting,
   }
+  shared.battleHotkeys = shared.commandMenu
 end

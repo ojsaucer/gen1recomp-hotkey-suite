@@ -5,9 +5,18 @@ return function(mod, suite)
   local function bindings()
     local value = mod.save:get("menu_hotkeys", {})
     if type(value) ~= "table" then value = {} end
+    if value.enabled == nil then value.enabled = false end
     value.keyboard = type(value.keyboard) == "table" and value.keyboard or {}
     value.gamepad = type(value.gamepad) == "table" and value.gamepad or {}
     return value
+  end
+
+  local function isEnabled() return bindings().enabled == true end
+
+  local function setEnabled(value)
+    local all = bindings()
+    all.enabled = value and true or false
+    mod.save:set("menu_hotkeys", all)
   end
 
   local function bindingFor(inputId, actionId)
@@ -28,6 +37,7 @@ return function(mod, suite)
       id = "menu." .. inputId .. "." .. actionId,
       input = inputId,
       context = "overworld",
+      enabled = isEnabled,
       get = function() return bindingFor(inputId, actionId) end,
       set = function(value) saveBinding(inputId, actionId, value) end,
       onFire = function(game)
@@ -44,7 +54,7 @@ return function(mod, suite)
   end
 
   local function rows(game, inputId)
-    local rows = {}
+    local rows = { shared.enabledRow("menuHotkey.enabled", isEnabled, setEnabled) }
     for _, item in ipairs(shared.refreshStartMenuItems(game)) do
       local current = item
       local spec = ensureSpec(inputId, current.id)
@@ -73,8 +83,10 @@ return function(mod, suite)
   suite.register("gamepad", {
     id = "menu_hotkeys", label = "MENU HOTKEYS", rows = rows,
   })
+  shared.registerReset(function() setEnabled(false) end)
+
   shared.menuHotkeys = {
     bindings = bindings, bindingFor = bindingFor, setBinding = saveBinding,
-    ensureSpec = ensureSpec,
+    ensureSpec = ensureSpec, isEnabled = isEnabled, setEnabled = setEnabled,
   }
 end

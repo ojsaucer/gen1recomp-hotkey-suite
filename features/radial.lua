@@ -19,7 +19,7 @@ return function(mod, suite)
   local function config()
     local cfg = mod.save:get("radial", {})
     if type(cfg) ~= "table" then cfg = {} end
-    if cfg.enabled == nil then cfg.enabled = true end
+    if cfg.enabled == nil then cfg.enabled = false end
     cfg.stick = cfg.stick == "right" and "right" or "left"
     if not POSITION_LABELS[cfg.position] then cfg.position = "center" end
     return cfg
@@ -202,22 +202,14 @@ return function(mod, suite)
     id = "radial", label = "RADIAL MENU",
     rows = function()
       return {
-        { id = "radialEnabled", label = "ENABLED",
-          value = function() return config().enabled and "ON" or "OFF" end,
-          step = function()
+        shared.enabledRow("radialEnabled",
+          function() return config().enabled end,
+          function(value)
             local cfg = config()
-            cfg.enabled = not cfg.enabled
+            cfg.enabled = value
             save(cfg)
-            if not cfg.enabled and active then active:close(false) end
-            return true
-          end,
-          unassign = function()
-            local cfg = config()
-            cfg.enabled = false
-            save(cfg)
-            if active then active:close(false) end
-            return true
-          end },
+            if not value and active then active:close(false) end
+          end),
         { id = "radialBinding", label = "HOTKEY",
           value = function() return shared.comboLabel(spec:get()) end,
           activate = function(game)
@@ -243,6 +235,13 @@ return function(mod, suite)
       }
     end,
   })
+
+  shared.registerReset(function()
+    local cfg = config()
+    cfg.enabled = false
+    save(cfg)
+    if active then active:close(false) end
+  end)
 
   shared.radial = {
     spec = spec, config = config, active = function() return active end,

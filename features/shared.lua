@@ -162,7 +162,7 @@ return function(mod, suite)
       for _, spec in ipairs(list) do
         if spec.signature ~= "" then
           assigned = assigned + 1
-          if not spec.enabled or spec.enabled() then active = active + 1 end
+          if shared.specEnabled(spec) then active = active + 1 end
         end
       end
     end
@@ -189,10 +189,30 @@ return function(mod, suite)
     return "other"
   end
 
+  local function specEnabled(spec)
+    if type(spec.enabled) ~= "function" then return true end
+    local ok, value = pcall(spec.enabled)
+    return not ok or value ~= false
+  end
+  shared.specEnabled = specEnabled
+
   local function contextAllows(spec, game)
+    if not specEnabled(spec) then return false end
     if spec.context == "any" then return true end
     if type(spec.context) == "function" then return spec.context(game) end
     return shared.context(game) == spec.context
+  end
+
+  -- A module master switch. Every module ships disabled so a fresh install
+  -- never reacts to input the player has not opted into.
+  function shared.enabledRow(id, get, set)
+    return {
+      id = id,
+      label = "ENABLED",
+      value = function() return get() and "ON" or "OFF" end,
+      step = function() set(not get()); return true end,
+      unassign = function() set(false); return true end,
+    }
   end
 
   local CaptureScreen = {}
