@@ -67,9 +67,16 @@ return function(mod, suite)
 
   -- The file is data only and is parsed with an empty environment, so a
   -- corrupted or hand-edited settings file can never reach the engine.
+  --
+  -- storeFlush writes a body that already carries its own `return`, so the
+  -- text is loaded as-is.  The bare-table form is still accepted so a file
+  -- written by hand, or by any earlier build, still loads.
   local function decode(text)
     if type(text) ~= "string" or text == "" then return nil end
-    local chunk = loadstring("return " .. text, "@hotkey_suite settings")
+    local chunk = loadstring(text, "@hotkey_suite settings")
+    if not chunk then
+      chunk = loadstring("return " .. text, "@hotkey_suite settings")
+    end
     if not chunk then return nil end
     if setfenv then setfenv(chunk, {}) end
     local ok, value = pcall(chunk)
@@ -77,11 +84,22 @@ return function(mod, suite)
     return nil
   end
 
+  -- A settings file that exists but cannot be read is a real fault: it means
+  -- the player's configuration is on disk and being ignored, which looks
+  -- exactly like every hotkey silently switching itself off.  Saying so is
+  -- the difference between a diagnosable bug and an invisible one.
   local function storeEnsure()
     if storeLoaded then return storeData end
     storeLoaded = true
     local ok, raw = pcall(function() return mod.cache:read(STORE_FILE) end)
     storeData = ok and decode(raw) or nil
+    if not storeData and ok and type(raw) == "string" and raw ~= "" then
+      if mod.log and mod.log.warn then
+        mod.log:warn("settings file could not be parsed; falling back to "
+          .. "defaults. The existing file is left untouched until a setting "
+          .. "is changed.")
+      end
+    end
     storeData = storeData or {}
     return storeData
   end

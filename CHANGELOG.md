@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.7.1] - 2026-09-19
+
+### Fixed
+
+- **Every module came up OFF on each launch, with settings intact on disk.**
+  The 1.7.0 settings writer emitted a file that already began with `return`,
+  and the reader prepended a second one, producing `return return {` — a
+  syntax error. *Every* load failed, so the suite started from defaults
+  (disabled, unbound) on every boot while the settings screens, the file on
+  disk, and the legacy importer all still showed the correct values. The
+  importer then rewrote the file from the save slot each launch, which is why
+  the settings looked perfectly preserved while nothing actually worked.
+  Settings are now read back correctly; a file written by any earlier build
+  is still accepted.
+- A settings file that exists but cannot be parsed is now reported in the log
+  instead of silently falling back to defaults, and is left untouched on disk
+  until a setting is changed.
+
 ## [1.7.0] - 2026-09-18
 
 ### Fixed
