@@ -31,7 +31,7 @@ return function(mod, suite)
   }
 
   local function config()
-    local cfg = mod.save:get("ballMenu", {})
+    local cfg = shared.store.get("ballMenu", nil)
     if type(cfg) ~= "table" then cfg = {} end
     if cfg.enabled == nil then cfg.enabled = false end
     cfg.bindings = type(cfg.bindings) == "table" and cfg.bindings or {}
@@ -40,7 +40,7 @@ return function(mod, suite)
     if not QUICK_BALL_LABELS[cfg.quickBall] then cfg.quickBall = "FIRST" end
     return cfg
   end
-  local function save(cfg) mod.save:set("ballMenu", cfg) end
+  local function save(cfg) shared.store.set("ballMenu", cfg) end
 
   local function battleState(game)
     local states = game and game.stack and game.stack.states
@@ -345,6 +345,8 @@ return function(mod, suite)
         id = "ballMenuBinding",
         label = "HOTKEY",
         value = function() return shared.comboLabel(spec:get()) end,
+        help = "Pressed from the main battle menu to throw a ball. It does "
+          .. "nothing anywhere else.",
         activate = function(game)
           shared.captureCombo(game, "BALL HOTKEY", spec)
         end,
@@ -357,6 +359,8 @@ return function(mod, suite)
         id = "ballMenuMode",
         label = "BEHAVIOR",
         value = function() return MODE_LABELS[config().mode] end,
+        help = "BALL MENU opens a picker listing the balls you carry. QUICK "
+          .. "THROW skips the picker and throws the ball chosen below.",
         step = function(_, dir)
           local cfg = config()
           cfg.mode = shared.cycle(MODES, cfg.mode, dir)
@@ -368,6 +372,8 @@ return function(mod, suite)
         id = "ballMenuPosition",
         label = "UI POSITION",
         value = function() return POSITION_LABELS[config().position] end,
+        help = "Where the ball picker is drawn. Move it clear of any custom "
+          .. "battle UI you have installed.",
         step = function(_, dir)
           local cfg = config()
           cfg.position = shared.cycle(POSITIONS, cfg.position, dir)
@@ -379,6 +385,8 @@ return function(mod, suite)
         id = "ballMenuQuickBall",
         label = "QUICK BALL",
         value = function() return QUICK_BALL_LABELS[config().quickBall] end,
+        help = "Which ball QUICK THROW uses. FIRST IN BAG picks the first "
+          .. "ball you are carrying.",
         step = function(_, dir)
           local cfg = config()
           cfg.quickBall = shared.cycle(QUICK_BALLS, cfg.quickBall, dir)
@@ -390,10 +398,10 @@ return function(mod, suite)
   end
 
   suite.register("keyboard", {
-    id = "ball_menu", label = "BALL MENU", rows = rows,
+    id = "ball_menu", label = "BALL MENU", context = "battle", rows = rows,
   })
   suite.register("gamepad", {
-    id = "ball_menu", label = "BALL MENU", rows = rows,
+    id = "ball_menu", label = "BALL MENU", context = "battle", rows = rows,
   })
 
   shared.registerReset(function()

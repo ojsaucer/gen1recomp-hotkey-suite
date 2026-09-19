@@ -3,13 +3,18 @@ return function(mod, suite)
   local Screens = require("src.ui.Screens")
   local TextBox = require("src.render.TextBox")
   local ACTIONS = {
-    { id = "fly", label = "FLY", short = "FLY" },
-    { id = "center", label = "RETURN CENTER", short = "PC" },
-    { id = "bike", label = "BICYCLE", short = "BIKE" },
+    { id = "fly", label = "FLY", short = "FLY",
+      help = "Opens the TOWN MAP to fly. Needs HM02 FLY and a free "
+        .. "overworld." },
+    { id = "center", label = "RETURN CENTER", short = "PC",
+      help = "Teleports to the last POKEMON CENTER you healed at, exactly as "
+        .. "DIG or an ESCAPE ROPE would." },
+    { id = "bike", label = "BICYCLE", short = "BIKE",
+      help = "Gets on or off the BICYCLE where the terrain allows it." },
   }
 
   local function config()
-    local cfg = mod.save:get("travel", {})
+    local cfg = shared.store.get("travel", nil)
     if type(cfg) ~= "table" then cfg = {} end
     if cfg.enabled == nil then cfg.enabled = false end
     cfg.bindings = type(cfg.bindings) == "table" and cfg.bindings or {}
@@ -19,7 +24,7 @@ return function(mod, suite)
       and cfg.bindings.gamepad or {}
     return cfg
   end
-  local function save(cfg) mod.save:set("travel", cfg) end
+  local function save(cfg) shared.store.set("travel", cfg) end
 
   local function notify(game, text)
     game.stack:push(TextBox.new(game, text))
@@ -122,6 +127,7 @@ return function(mod, suite)
         id = "travel." .. current.id,
         label = current.label,
         value = function() return shared.comboLabel(spec:get()) end,
+        help = current.help,
         activate = function(game)
           shared.captureCombo(game, current.label .. " HOTKEY", spec)
         end,
@@ -132,10 +138,10 @@ return function(mod, suite)
   end
 
   suite.register("keyboard", {
-    id = "travel", label = "TRAVEL HOTKEYS", rows = rows,
+    id = "travel", label = "TRAVEL HOTKEYS", context = "overworld", rows = rows,
   })
   suite.register("gamepad", {
-    id = "travel", label = "TRAVEL HOTKEYS", rows = rows,
+    id = "travel", label = "TRAVEL HOTKEYS", context = "overworld", rows = rows,
   })
 
   shared.registerReset(function()

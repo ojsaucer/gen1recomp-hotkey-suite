@@ -29,7 +29,7 @@ return function(mod, suite)
   }
 
   local function config()
-    local cfg = mod.save:get("autofire", {})
+    local cfg = shared.store.get("autofire", nil)
     if type(cfg) ~= "table" then cfg = {} end
     if cfg.enabled == nil then cfg.enabled = false end
     if cfg.mode ~= "toggle" and cfg.mode ~= "hold" then cfg.mode = "toggle" end
@@ -43,7 +43,7 @@ return function(mod, suite)
     cfg.bindings = type(cfg.bindings) == "table" and cfg.bindings or {}
     return cfg
   end
-  local function save(cfg) mod.save:set("autofire", cfg) end
+  local function save(cfg) shared.store.set("autofire", cfg) end
   local function stop()
     state.active, state.target, state.source = false, nil, nil
     state.selector, state.accumulator = nil, 0
@@ -117,6 +117,10 @@ return function(mod, suite)
       stop()
       return
     end
+    -- Autofire keeps running across screens by design, but it must not drive
+    -- the suite's own UI: a toggled-on autofire targeting A would otherwise
+    -- tap straight through a help box before it could be read.
+    if shared.suiteScreenOpen and shared.suiteScreenOpen(game) then return end
     state.accumulator = state.accumulator + dt
     local interval = 1 / SPEEDS[cfg.speed].rate
     while state.accumulator >= interval do
@@ -175,10 +179,16 @@ return function(mod, suite)
           save(cfg)
           if not value then stop() end
         end),
-      { id = "afMethod", label = "METHOD", value = methodValue, step = methodStep },
-      { id = "afMode", label = "MODE", value = modeValue, step = modeStep },
+      { id = "afMethod", label = "METHOD", value = methodValue, step = methodStep,
+        help = "FIXED BUTTON always repeats the button set below. NEXT INPUT "
+          .. "repeats whichever button you press next while the hotkey is "
+          .. "held." },
+      { id = "afMode", label = "MODE", value = modeValue, step = modeStep,
+        help = "TOGGLE starts and stops repeating on each press. HOLD repeats "
+          .. "only while the hotkey stays held down." },
       { id = "afSpeed", label = "SPEED",
         value = function() return SPEEDS[config().speed].label end,
+        help = "How many times per second the button is re-pressed.",
         step = function(_, dir)
           local cfg = config()
           cfg.speed = ((cfg.speed - 1 + (dir or 1)) % #SPEEDS) + 1
@@ -186,18 +196,27 @@ return function(mod, suite)
           return true
         end },
       { id = "afTarget", label = "FIXED BUTTON", value = targetValue,
+        help = "The button repeated when METHOD is FIXED BUTTON.",
         step = targetStep },
       { id = "afNotice", label = "AF NOTICE", value = noticeValue,
+        help = "Shows an AUTOFIRE badge in the chosen screen corner while "
+          .. "TOGGLE mode is running. OFF hides it.",
         step = noticeStep },
       { id = "afBinding", label = "HOTKEY",
         value = function() return shared.comboLabel(spec:get()) end,
+        help = "The key or button combination that starts autofire. Gamepad "
+          .. "triggers LT and RT are supported.",
         activate = function(g) shared.captureCombo(g, "AUTOFIRE HOTKEY", spec) end,
         unassign = function() shared.setBinding(spec, nil); return true end },
     }
   end
 
-  suite.register("keyboard", { id = "autofire", label = "AUTOFIRE HOTKEYS", rows = rows })
-  suite.register("gamepad", { id = "autofire", label = "AUTOFIRE HOTKEYS", rows = rows })
+  suite.register("keyboard", {
+    id = "autofire", label = "AUTOFIRE HOTKEYS", context = "general", rows = rows,
+  })
+  suite.register("gamepad", {
+    id = "autofire", label = "AUTOFIRE HOTKEYS", context = "general", rows = rows,
+  })
 
   shared.registerReset(function()
     local cfg = config()

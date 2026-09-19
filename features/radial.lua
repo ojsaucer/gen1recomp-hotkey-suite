@@ -17,14 +17,14 @@ return function(mod, suite)
   }
 
   local function config()
-    local cfg = mod.save:get("radial", {})
+    local cfg = shared.store.get("radial", nil)
     if type(cfg) ~= "table" then cfg = {} end
     if cfg.enabled == nil then cfg.enabled = false end
     cfg.stick = cfg.stick == "right" and "right" or "left"
     if not POSITION_LABELS[cfg.position] then cfg.position = "center" end
     return cfg
   end
-  local function save(cfg) mod.save:set("radial", cfg) end
+  local function save(cfg) shared.store.set("radial", cfg) end
 
   local function neutralize(screen)
     if screen then
@@ -199,7 +199,7 @@ return function(mod, suite)
   end)
 
   suite.register("gamepad", {
-    id = "radial", label = "RADIAL MENU",
+    id = "radial", label = "RADIAL MENU", context = "overworld",
     rows = function()
       return {
         shared.enabledRow("radialEnabled",
@@ -212,12 +212,15 @@ return function(mod, suite)
           end),
         { id = "radialBinding", label = "HOTKEY",
           value = function() return shared.comboLabel(spec:get()) end,
+          help = "Hold this to open the radial menu, aim with the stick, then "
+            .. "release to pick the highlighted entry.",
           activate = function(game)
             shared.captureCombo(game, "RADIAL HOTKEY", spec)
           end,
           unassign = function() shared.setBinding(spec, nil); return true end },
         { id = "radialStick", label = "STICK",
           value = function() return config().stick:upper() end,
+          help = "Which analogue stick aims the radial menu.",
           step = function(_, dir)
             local cfg = config()
             cfg.stick = shared.cycle({ "left", "right" }, cfg.stick, dir)
@@ -226,6 +229,7 @@ return function(mod, suite)
           end },
         { id = "radialPosition", label = "POSITION",
           value = function() return POSITION_LABELS[config().position] end,
+          help = "Where the radial menu is drawn on screen.",
           step = function(_, dir)
             local cfg = config()
             cfg.position = shared.cycle(POSITIONS, cfg.position, dir)

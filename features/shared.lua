@@ -2,6 +2,151 @@ return function(mod, suite)
   local shared = suite.shared
   local Font = require("src.render.Font")
   local Screens = require("src.ui.Screens")
+
+  -- Settings persistence.
+  --
+  -- `mod.save` is backed by `save.modData` (src/core/Game.lua, Game:adoptSave),
+  -- which makes it *save-slot* state: it only reaches disk when the player
+  -- saves in-game, and adoptSave REPLACES the loader's bucket outright on NEW
+  -- GAME and CONTINUE.  Every hotkey spec compiles its combination once at
+  -- registration time, so swapping the backing table out from under it left
+  -- the broker holding boot-time (empty) combinations while the settings
+  -- screens still read the real values -- hotkeys looked assigned and fired
+  -- nothing.  It also meant a crash, or quitting without saving, discarded
+  -- whatever the player had just configured.
+  --
+  -- Hotkey configuration describes the installation, not a playthrough, so it
+  -- belongs in `mod.cache`: installation-scoped, independent of save slots,
+  -- and written straight through to disk (src/mods/ImportAccess.lua).
+  local STORE_FILE = "settings.lua"
+  local LEGACY_KEYS = {
+    "bindings", "autofire", "menu_hotkeys", "radial", "travel",
+    "battleHotkeys", "ballMenu", "battleText",
+  }
+  local storeData, storeLoaded, storeBroken
+
+  local function encode(value, indent, out)
+    local kind = type(value)
+    if kind == "table" then
+      local inner = indent .. "  "
+      local count = #value
+      out[#out + 1] = "{\n"
+      for i = 1, count do
+        out[#out + 1] = inner
+        encode(value[i], inner, out)
+        out[#out + 1] = ",\n"
+      end
+      local keys = {}
+      for key in pairs(value) do
+        local isArrayIndex = type(key) == "number" and key % 1 == 0
+          and key >= 1 and key <= count
+        local usable = type(key) == "string" or type(key) == "number"
+          or type(key) == "boolean"
+        if usable and not isArrayIndex then keys[#keys + 1] = key end
+      end
+      table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+      for _, key in ipairs(keys) do
+        out[#out + 1] = inner .. "["
+        encode(key, inner, out)
+        out[#out + 1] = "] = "
+        encode(value[key], inner, out)
+        out[#out + 1] = ",\n"
+      end
+      out[#out + 1] = indent .. "}"
+    elseif kind == "string" then
+      out[#out + 1] = string.format("%q", value)
+    elseif kind == "number" then
+      out[#out + 1] = value % 1 == 0 and string.format("%d", value)
+        or string.format("%.14g", value)
+    elseif kind == "boolean" then
+      out[#out + 1] = tostring(value)
+    else
+      out[#out + 1] = "nil"
+    end
+  end
+
+  -- The file is data only and is parsed with an empty environment, so a
+  -- corrupted or hand-edited settings file can never reach the engine.
+  local function decode(text)
+    if type(text) ~= "string" or text == "" then return nil end
+    local chunk = loadstring("return " .. text, "@hotkey_suite settings")
+    if not chunk then return nil end
+    if setfenv then setfenv(chunk, {}) end
+    local ok, value = pcall(chunk)
+    if ok and type(value) == "table" then return value end
+    return nil
+  end
+
+  local function storeEnsure()
+    if storeLoaded then return storeData end
+    storeLoaded = true
+    local ok, raw = pcall(function() return mod.cache:read(STORE_FILE) end)
+    storeData = ok and decode(raw) or nil
+    storeData = storeData or {}
+    return storeData
+  end
+
+  local function storeFlush()
+    local out = {}
+    encode(storeEnsure(), "", out)
+    local body = "return " .. table.concat(out) .. "\n"
+    -- mod.cache:write reports failure by returning `nil, reason` rather than
+    -- raising, so both outcomes have to be checked.
+    local ok, wrote, reason = pcall(function()
+      return mod.cache:write(STORE_FILE, body)
+    end)
+    if (not ok or not wrote) and not storeBroken then
+      storeBroken = true
+      if mod.log and mod.log.warn then
+        mod.log:warn("could not persist settings: " ..
+          tostring(ok and (reason or "write failed") or wrote))
+      end
+    end
+  end
+
+  local store = {}
+  function store.get(key, default)
+    local value = storeEnsure()[key]
+    if value == nil then return default end
+    return value
+  end
+  function store.set(key, value)
+    local data = storeEnsure()
+    data[key] = value
+    -- Once the player has written anything through the new store their
+    -- configuration is authoritative, so no save file may import over it.
+    data.__migrated = true
+    storeFlush()
+  end
+  shared.store = store
+
+  -- One-way import of pre-1.7 configuration out of the save slot.  It can only
+  -- run while nothing has been written through the new store, and it latches
+  -- the moment it finds anything, so loading an older save later can never
+  -- clobber settings the player has since changed.
+  local function storeMigrate()
+    local data = storeEnsure()
+    if data.__migrated then return false end
+    local imported = false
+    for _, key in ipairs(LEGACY_KEYS) do
+      if data[key] == nil then
+        local legacy = mod.save:get(key, nil)
+        if type(legacy) == "table" and next(legacy) ~= nil then
+          data[key] = legacy
+          imported = true
+        end
+      end
+    end
+    if not imported then return false end
+    data.__migrated = true
+    storeFlush()
+    if mod.log and mod.log.info then
+      mod.log:info("imported legacy hotkey settings from the save slot")
+    end
+    return true
+  end
+  shared.migrateSettings = storeMigrate
+
   local menuCache = setmetatable({}, { __mode = "k" })
   local menuListeners = {}
   local hotkeys = { keyboard = {}, gamepad = {} }
@@ -81,7 +226,7 @@ return function(mod, suite)
   shared.bindingAllowed = bindingAllowed
 
   local function bindingStore()
-    local value = mod.save:get("bindings", {})
+    local value = store.get("bindings", nil)
     return type(value) == "table" and value or {}
   end
 
@@ -196,8 +341,28 @@ return function(mod, suite)
   end
   shared.specEnabled = specEnabled
 
+  -- A bound key pressed while the player is editing bindings belongs to the
+  -- settings screen, not to the hotkey it is assigned to.  This scans the
+  -- whole stack rather than just the top, because the suite pushes its own
+  -- help boxes OVER a settings screen: checking only the top would let
+  -- synthesized input (autofire) through the moment help opened, which blew
+  -- straight past the help text before it could be read.
+  local function suiteScreenOpen(game)
+    local stack = game and game.stack
+    local states = stack and stack.states
+    for index = #(states or {}), 1, -1 do
+      local state = states[index]
+      if type(state) == "table" and state.isHotkeySuiteScreen == true then
+        return true
+      end
+    end
+    return false
+  end
+  shared.suiteScreenOpen = suiteScreenOpen
+
   local function contextAllows(spec, game)
     if not specEnabled(spec) then return false end
+    if suiteScreenOpen(game) then return false end
     if spec.context == "any" then return true end
     if type(spec.context) == "function" then return spec.context(game) end
     return shared.context(game) == spec.context
@@ -218,6 +383,7 @@ return function(mod, suite)
   local CaptureScreen = {}
   CaptureScreen.__index = CaptureScreen
   CaptureScreen.isOpaque = true
+  CaptureScreen.isHotkeySuiteScreen = true
   CaptureScreen.MAX_PIECES = 4
 
   function CaptureScreen:sgbPalettes(game)
@@ -440,6 +606,9 @@ return function(mod, suite)
 
   mod.hooks:wrap("input.step", function(next, game, dt)
     next(game, dt)
+    -- Cheap no-op once the flag latches; this is the first point in the frame
+    -- where a CONTINUE has already pointed mod.save at the loaded slot.
+    if storeMigrate() then shared.refreshHotkeys() end
     if love and love.keyboard and type(love.keyboard.isDown) == "function" then
       for key, isHeld in pairs(heldInputs.keyboard) do
         if isHeld then

@@ -3,7 +3,7 @@ return function(mod, suite)
   local specs = { keyboard = {}, gamepad = {} }
 
   local function bindings()
-    local value = mod.save:get("menu_hotkeys", {})
+    local value = shared.store.get("menu_hotkeys", nil)
     if type(value) ~= "table" then value = {} end
     if value.enabled == nil then value.enabled = false end
     value.keyboard = type(value.keyboard) == "table" and value.keyboard or {}
@@ -16,7 +16,7 @@ return function(mod, suite)
   local function setEnabled(value)
     local all = bindings()
     all.enabled = value and true or false
-    mod.save:set("menu_hotkeys", all)
+    shared.store.set("menu_hotkeys", all)
   end
 
   local function bindingFor(inputId, actionId)
@@ -28,7 +28,7 @@ return function(mod, suite)
   local function saveBinding(inputId, actionId, value)
     local all = bindings()
     all[inputId][actionId] = value or false
-    mod.save:set("menu_hotkeys", all)
+    shared.store.set("menu_hotkeys", all)
   end
 
   local function ensureSpec(inputId, actionId)
@@ -62,6 +62,9 @@ return function(mod, suite)
         id = "menuHotkey." .. current.id,
         label = current.label,
         value = function() return shared.comboLabel(spec:get()) end,
+        help = "Opens " .. tostring(current.label) .. " straight from the "
+          .. "overworld. Combinations win over single buttons, so RT+Y can "
+          .. "sit alongside a plain Y.",
         activate = function(g) shared.captureCombo(g, current.label, spec) end,
         unassign = function() shared.setBinding(spec, nil); return true end,
       }
@@ -69,6 +72,7 @@ return function(mod, suite)
     rows[#rows + 1] = {
       id = "menuHotkey.clear",
       label = "CLEAR BINDINGS",
+      help = "Unassigns every menu hotkey for this controller type.",
       activate = function()
         for _, spec in pairs(specs[inputId]) do shared.setBinding(spec, nil) end
         return true
@@ -78,10 +82,12 @@ return function(mod, suite)
   end
 
   suite.register("keyboard", {
-    id = "menu_hotkeys", label = "MENU HOTKEYS", rows = rows,
+    id = "menu_hotkeys", label = "MENU HOTKEYS", context = "overworld",
+    rows = rows,
   })
   suite.register("gamepad", {
-    id = "menu_hotkeys", label = "MENU HOTKEYS", rows = rows,
+    id = "menu_hotkeys", label = "MENU HOTKEYS", context = "overworld",
+    rows = rows,
   })
   shared.registerReset(function() setEnabled(false) end)
 

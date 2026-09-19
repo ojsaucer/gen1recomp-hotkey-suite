@@ -31,24 +31,12 @@ return function(mod, suite)
     bottom_center = "BOTTOM CENTER", bottom_right = "BOTTOM RIGHT",
   }
   local LEGEND_SCALES = { 0.75, 1, 1.25, 1.5 }
-  local AUTO_TEXT_SPEEDS = {
-    { label = "SLOW", delay = 0.70 },
-    { label = "MEDIUM", delay = 0.45 },
-    { label = "FAST", delay = 0.25 },
-    { label = "VERY FAST", delay = 0.12 },
-  }
 
   local function config()
-    local cfg = mod.save:get("battleHotkeys", {})
+    local cfg = shared.store.get("battleHotkeys", nil)
     if type(cfg) ~= "table" then cfg = {} end
     if cfg.enabled == nil then cfg.enabled = false end
     cfg.bindings = type(cfg.bindings) == "table" and cfg.bindings or {}
-    if cfg.autoText == nil then cfg.autoText = false end
-    cfg.autoTextSpeed = tonumber(cfg.autoTextSpeed)
-    if not cfg.autoTextSpeed or cfg.autoTextSpeed % 1 ~= 0
-        or not AUTO_TEXT_SPEEDS[cfg.autoTextSpeed] then
-      cfg.autoTextSpeed = 2
-    end
     if not LEGEND_POSITION_LABELS[cfg.legendPosition] then
       cfg.legendPosition = "top_center"
     end
@@ -61,7 +49,7 @@ return function(mod, suite)
   end
 
   local function save(cfg)
-    mod.save:set("battleHotkeys", cfg)
+    shared.store.set("battleHotkeys", cfg)
   end
 
   local function battleState(game)
@@ -197,12 +185,10 @@ return function(mod, suite)
     love.graphics.pop()
   end
 
-  -- Auto Text Skip taps the same A the player would press, and only while the
-  -- battle itself is the top state and is parked on a message waiting for
-  -- input. Choice prompts (yes/no, nickname, learn-move) push their own screen
-  -- on top, so they stay under manual control.
-  local autoText = { accumulator = 0 }
-
+  -- `textWaiting` is the gate the Battle Text module drives auto-advance from:
+  -- true only while the battle itself is the top state and is parked on a
+  -- message waiting for input.  Choice prompts (yes/no, nickname, learn-move)
+  -- push their own screen on top, so they stay under manual control.
   local function textWaiting(game, battle)
     if not battle then return false end
     if battle.demo then return false end
@@ -216,26 +202,6 @@ return function(mod, suite)
     return battle.msgWaiting == true or battle.msgPrompt == true
       or battle.waitingForInput == true
   end
-
-  mod.hooks:wrap("input.step", function(next, game, dt)
-    next(game, dt)
-    local cfg = config()
-    if not cfg.enabled or not cfg.autoText then
-      autoText.accumulator = 0
-      return
-    end
-    local battle = battleState(game)
-    if not textWaiting(game, battle) then
-      autoText.accumulator = 0
-      return
-    end
-    autoText.accumulator = autoText.accumulator + (dt or 0)
-    local delay = AUTO_TEXT_SPEEDS[cfg.autoTextSpeed].delay
-    if autoText.accumulator >= delay then
-      autoText.accumulator = 0
-      mod.input:tap(game, "a")
-    end
-  end)
 
   local function legendLabels(battle)
     if commandReady(battle) then
@@ -395,13 +361,15 @@ return function(mod, suite)
           save(cfg)
           if not value then
             active.keyboard, active.gamepad = false, false
-            autoText.accumulator = 0
           end
         end),
       {
         id = "battle.commands.binding",
         label = "CMD MODE",
         value = function() return shared.comboLabel(config().bindings[inputId]) end,
+        help = "Hold this in battle to steer the command menu and the move "
+          .. "list with the D-pad. The vanilla cursor is replaced by arrows "
+          .. "matching each entry.",
         activate = function(game)
           shared.captureCombo(game, "CMD MODE HOTKEY", commandSpec)
         end,
@@ -416,6 +384,8 @@ return function(mod, suite)
         value = function()
           return shared.comboLabel(config().bindings[inputId .. "Run"])
         end,
+        help = "Runs from battle in one press. Only works from the main "
+          .. "battle menu.",
         activate = function(game)
           shared.captureCombo(game, "RUN HOTKEY", runSpec)
         end,
@@ -425,44 +395,13 @@ return function(mod, suite)
         end,
       },
       {
-        id = "battle.autoText",
-        label = "AUTO TEXT",
-        value = function() return config().autoText and "ON" or "OFF" end,
-        step = function()
-          local cfg = config()
-          cfg.autoText = not cfg.autoText
-          save(cfg)
-          autoText.accumulator = 0
-          return true
-        end,
-        unassign = function()
-          local cfg = config()
-          cfg.autoText = false
-          save(cfg)
-          autoText.accumulator = 0
-          return true
-        end,
-      },
-      {
-        id = "battle.autoTextSpeed",
-        label = "TEXT SPEED",
-        value = function()
-          return AUTO_TEXT_SPEEDS[config().autoTextSpeed].label
-        end,
-        step = function(_, dir)
-          local cfg = config()
-          cfg.autoTextSpeed = ((cfg.autoTextSpeed - 1 + (dir or 1))
-            % #AUTO_TEXT_SPEEDS) + 1
-          save(cfg)
-          return true
-        end,
-      },
-      {
         id = "battle.legend.position",
         label = "UI POSITION",
         value = function()
           return LEGEND_POSITION_LABELS[config().legendPosition]
         end,
+        help = "Where the floating command legend appears when a custom "
+          .. "battle UI mod hides the vanilla bottom panel.",
         step = function(_, dir)
           local cfg = config()
           cfg.legendPosition = shared.cycle(
@@ -477,6 +416,7 @@ return function(mod, suite)
         value = function()
           return ("%d%%"):format(math.floor(config().legendScale * 100 + 0.5))
         end,
+        help = "Size of the floating command legend.",
         step = function(_, dir)
           local cfg = config()
           cfg.legendScale = shared.cycle(
@@ -489,24 +429,24 @@ return function(mod, suite)
   end
 
   suite.register("keyboard", {
-    id = "command_menu", label = "BATTLE CMD MENU", rows = rows,
+    id = "command_menu", label = "BATTLE CMD MENU", context = "battle",
+    rows = rows,
   })
   suite.register("gamepad", {
-    id = "command_menu", label = "BATTLE CMD MENU", rows = rows,
+    id = "command_menu", label = "BATTLE CMD MENU", context = "battle",
+    rows = rows,
   })
 
   shared.registerReset(function()
     local cfg = config()
     cfg.enabled = false
-    cfg.autoText = false
     save(cfg)
     active.keyboard, active.gamepad = false, false
-    autoText.accumulator = 0
   end)
 
   shared.commandMenu = {
     active = active,
-    autoTextSpeeds = AUTO_TEXT_SPEEDS,
+    battleState = battleState,
     choose = choose,
     chooseMove = chooseMove,
     config = config,

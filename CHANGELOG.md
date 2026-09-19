@@ -1,5 +1,68 @@
 # Changelog
 
+## [1.7.0] - 2026-09-18
+
+### Fixed
+
+- **Settings now survive restarts, crashes and loading a save.** This is the
+  root cause behind several long-standing reports: hotkeys that read as
+  assigned but fired nothing, settings that reverted on restart, and every
+  binding going dead after a crash. Configuration was stored in `mod.save`,
+  which the engine backs with `save.modData` — save-slot state that only
+  reaches disk when the player saves in-game, and which `Game:adoptSave`
+  **replaces outright** on NEW GAME and CONTINUE. Because every hotkey
+  compiles its combination once at registration, swapping that table out
+  from under the suite left the input broker holding boot-time (empty)
+  combinations while the settings screens still displayed the real ones.
+  Configuration has moved to `mod.cache`, which is installation-scoped,
+  independent of save slots, and written straight through to disk the moment
+  a setting changes.
+- Existing settings are imported automatically the first time 1.7.0 runs.
+  The import is one-way and latches immediately, so loading an older save
+  later can never overwrite settings changed since.
+- Keys bound to a hotkey no longer double-fire that hotkey while you are
+  editing bindings in the suite's own settings screens.
+- Help text no longer scrolls past before it can be read. `TextBox` only
+  waits for a button at a *page* break; within a page it advances line to
+  line on its own, scrolling a two-line window. Help strings carried no page
+  breaks, so they typed straight through and left only their last two lines
+  on screen. Help is now pre-broken into two-line pages at the engine's own
+  wrap width, so each page holds for `A`.
+- Autofire no longer drives the suite's own screens. A toggled-on autofire
+  kept tapping its target over the settings and help screens, where its
+  `AUTOFIRE` badge is not drawn to show it was still running.
+
+### Added
+
+- **Battle Text module.** `AUTO TEXT` advances battle messages on its own,
+  `LEVEL UP` also dismisses the level-up stat window, and `SPEED` sets the
+  rate for both. Auto text moved here out of Battle Command Menu, where it
+  never thematically belonged.
+- **Per-setting help.** Press `START` on any setting for an explanation of
+  what it does. Every setting except each module's `ENABLED` switch has one.
+- **Controls legend.** Screens with bindable hotkeys now show `SEL:CLEAR
+  ST:HELP` along the bottom, so the unassign and help keys are discoverable
+  rather than folklore. It replaces the old `BACK` row — `B` still backs out.
+
+### Changed
+
+- **Options are reorganized** into
+  `OPTIONS > HOTKEY SUITE > KEYBOARD/GAMEPAD > OVERWORLD/BATTLE/GENERAL >
+  MODULES`. Each module is filed under the context it is used in — Travel and
+  Menu Hotkeys under `OVERWORLD`, Ball Menu and the battle modules under
+  `BATTLE`, Autofire under `GENERAL` — so the list stays navigable as more
+  modules are added.
+- `BATTLE MENU` is now `BATTLE CMD MENU` (Battle Command Menu).
+
+### Removed
+
+- The `START MENU > ASCENDANT` entry. Kanto Ascendant's collector only files
+  items under four hardcoded groups (quests / research / partners / events),
+  and its `ASCENDANT > SETTINGS` screen builds its children from a private
+  registry with no third-party injection point, so no contextually sensible
+  placement was reachable. `OPTIONS > HOTKEY SUITE` is the single entry
+  point and works on every install, with or without Kanto Ascendant.
+
 ## [1.6.1] - 2026-09-17
 
 ### Fixed

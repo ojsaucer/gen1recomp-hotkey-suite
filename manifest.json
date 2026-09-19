@@ -1,7 +1,7 @@
 {
   "id": "hotkey_suite",
   "name": "Hotkey Suite",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "api": 2,
   "entry": "main.lua",
   "profile": "content",
@@ -11,7 +11,7 @@
   "games": ["red", "blue", "yellow"],
   "conflicts": ["autofire_hotkey", "menu_hotkeys", "radial_menu"],
   "optional_dependencies": ["kanto_ascendant"],
-  "description": "A modular keyboard and gamepad accessibility suite with autofire, menu, radial, travel, battle, and ball hotkeys.",
+  "description": "A modular keyboard and gamepad accessibility suite with autofire, menu, radial, travel, battle command, battle text, and ball hotkeys.",
   "authors": ["ojsaucer"],
   "license": "MIT"
 }
