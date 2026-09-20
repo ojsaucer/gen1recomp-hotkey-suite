@@ -2,13 +2,13 @@
 
 A modular accessibility and input suite for **Keyboard** and **Gamepad** in Pokémon Red, Blue, and Yellow.
 
-Configure everything from one menu:  
-`OPTIONS > HOTKEY SUITE > KEYBOARD / GAMEPAD > OVERWORLD / BATTLE / GENERAL`
+Configure everything from one place:  
+`OPTIONS > HOTKEY SUITE`
 
 > ### ⚠️ Everything starts OFF
 > **Every module ships disabled and every hotkey ships unbound.** Installing the
 > suite changes nothing about how the game plays until you opt in. Open a module,
-> flip its **ENABLED** switch to **ON**, then assign the hotkeys you want.
+> flip **ENABLED** to **ON**, then assign the hotkeys you want.
 
 Settings are saved per installation, not per save file, and are written to disk
 the moment you change them. Press **START** on any setting for help.
@@ -76,15 +76,8 @@ Each module below has its own **ENABLED** master switch (**OFF** by default).
 
 ### Updating
 
-From 1.7.2 onward the mod declares its repository in the manifest, so the
-launcher's MODS panel can update it for you: **Update** installs the newest
-release and **Versions** lets you roll to any published release.
-
-> **Upgrading from 1.7.1 or earlier?** Install 1.7.2 by hand once. The launcher
-> reads the repository field from the copy you already have installed, and
-> builds before 1.7.2 don't have one — so they can't offer themselves an
-> update. After 1.7.2 is in place, updating works from the launcher.
-
+> **Upgrading from 1.7.1 or earlier?** Install 1.7.2 by hand once,
+> then you can update within the launcher itself.
 ---
 
 ## License
