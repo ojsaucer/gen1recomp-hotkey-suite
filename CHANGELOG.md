@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.9.0] - 2026-09-20
+
+### Added
+
+- **SKIP LV SFX now also silences the learn-a-move jingle.** Learning a move
+  plays the same blocking fanfare a level-up does, in both of the game's
+  paths: straight into a free slot, and through the "delete an older move?"
+  screen. Both are now covered by the one setting.
+- **LEARN TEXT, a new Battle Text setting.** When a Pokémon with four moves
+  learns a new one, the game makes you page through "… is trying to learn …",
+  "But … can't learn more than 4 moves!" and "Delete an older move to make
+  room for …?" before the YES/NO appears. LEARN TEXT advances those pages for
+  you and **stops at the decision** — whether to forget a move is always left
+  to you. It uses the module's existing SPEED setting.
+
+### Fixed
+
+- **Move accuracy showed no `%` sign.** The Gen 1 font has no percent glyph
+  in its charmap, so printing one drew nothing and left the accuracy as a
+  bare number with no unit. The sign is now drawn from primitives, the same
+  way the power icon is, and is sized to fit its column.
+
+### Note
+
+**LEARN TEXT ships off**, like every other setting in this suite, and the
+learn-a-move fanfare is only silenced if SKIP LV SFX is already on.
+
 ## [1.8.0] - 2026-09-19
 
 ### Added

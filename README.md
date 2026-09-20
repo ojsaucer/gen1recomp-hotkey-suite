@@ -45,7 +45,8 @@ Each module below has its own **ENABLED** master switch (**OFF** by default).
 ### 💬 Battle Text
 - **Auto Text:** Automatically advances battle messages at a configurable speed (`Slow`, `Medium`, `Fast`, `Very Fast`) while leaving menus, move selection, and yes/no prompts fully under your control.
 - **Level Up:** Also dismisses the level-up stat window automatically.
-- **Skip Lv SFX:** Skips the level-up fanfare, removing the pause the game takes to play it. Fanfares for catching a Pokémon, new Pokédex entries, and learning moves are untouched.
+- **Skip Lv SFX:** Skips the level-up fanfare and the one for learning a new move, removing the pause the game takes to play them. Fanfares for catching a Pokémon, new Pokédex entries, and winning a battle are untouched.
+- **Learn Text:** When a Pokémon with four moves learns a new one, advances the pages in front of the "delete an older move?" prompt and stops at the YES/NO. The choice is always left to you.
 
 ### 🔴 Ball Menu
 - **Ball Menu:** Battle-only hotkey opening a compact **single-line** selector. Cycle ball types with Left/Right, throw with `A`, cancel with `B`.

@@ -244,6 +244,22 @@ return function(mod, suite)
     g.rectangle("fill", x + 2, y + 7, 4, 1)
   end
 
+  -- The Gen 1 charmap has no '%' tile (263 glyphs, none of them a percent
+  -- sign), so Font.draw would silently swallow it and leave the accuracy a
+  -- bare number with no unit.  Drawn from rectangles for the same reason the
+  -- sword is: two dots and a slash, no ROM art.
+  local PERCENT_ADVANCE = 7
+  local function drawPercent(x, y)
+    local g = love.graphics
+    g.rectangle("fill", x, y + 1, 2, 2)
+    g.rectangle("fill", x + 4, y + 5, 2, 2)
+    g.rectangle("fill", x + 4, y + 1, 1, 1)
+    g.rectangle("fill", x + 3, y + 2, 1, 1)
+    g.rectangle("fill", x + 2, y + 3, 1, 1)
+    g.rectangle("fill", x + 1, y + 4, 1, 1)
+    g.rectangle("fill", x, y + 5, 1, 1)
+  end
+
   -- Mod-added types keep their own name, so fall back to its first three
   -- characters instead of showing a raw id that would not fit the column.
   local function typeAbbrev(battle, typeId)
@@ -273,7 +289,10 @@ return function(mod, suite)
     return {
       power = power > 0 and tostring(math.floor(power)) or "--",
       type = typeAbbrev(battle, def.type),
-      acc = acc and ("%d%%"):format(math.floor(acc + 0.5)) or "--",
+      acc = acc and tostring(math.floor(acc + 0.5)) or "--",
+      -- The sign is drawn, not printed, so the caller needs to know whether
+      -- this row has a number to put one after.
+      accPercent = acc ~= nil,
     }
   end
 
@@ -496,6 +515,9 @@ return function(mod, suite)
         Font.draw(stats.power, x + INFO_POWER_TEXT, infoY)
         Font.draw(stats.type, x + INFO_TYPE, infoY)
         Font.draw(stats.acc, x + INFO_ACC, infoY)
+        if stats.accPercent then
+          drawPercent(x + INFO_ACC + Font.width(stats.acc), infoY)
+        end
       end
     end
     g.pop()
@@ -651,6 +673,13 @@ return function(mod, suite)
     customBattleUI = customBattleUI,
     customLegend = function() return customLegend end,
     commands = COMMANDS,
+    infoColumns = function()
+      return {
+        indent = INFO_INDENT, powerIcon = INFO_POWER_ICON,
+        powerText = INFO_POWER_TEXT, type = INFO_TYPE, acc = INFO_ACC,
+        width = INFO_WIDTH, percentAdvance = PERCENT_ADVANCE,
+      }
+    end,
     legendEntries = legendEntries,
     legendLayout = legendLayout,
     legendMetrics = legendMetrics,
