@@ -118,6 +118,46 @@ return function(mod, suite)
       and rawget(state, "done") ~= nil
   end
 
+  -- True when a TextBox is parked on a button press.  A box does not report
+  -- that itself, so the states are read back from its own fields in the order
+  -- TextBox:update tests them:
+  --   * before the last page, `waiting` is the mid-text arrow;
+  --   * once `done`, `stay` only blocks when it asked for a prompt, `auto`
+  --     drives itself except for promptFirst (and auto.wait clears `auto`
+  --     before the box reaches the button), `choice` is the player's;
+  --   * anything else past `done` is the plain A/B dismissal.
+  local function textBoxBlocked(box)
+    if not isTextBox(box) then return false end
+    if box.done ~= true then return box.waiting == true end
+    local stay = rawget(box, "stay")
+    if stay ~= nil then
+      return type(stay) == "table" and stay.prompt == true
+        and box.stayShown ~= true
+    end
+    local auto = rawget(box, "auto")
+    if auto ~= nil then
+      return type(auto) == "table" and auto.promptFirst == true
+        and box.autoPrompted ~= true
+    end
+    if rawget(box, "choice") ~= nil then return false end
+    return true
+  end
+
+  -- Battle messages that are not the battle's own queue: the learned-move
+  -- pages, "did not learn", "HM techniques can't be deleted!", the blackout.
+  -- They are TextBoxes pushed over the battle, so the queue's msgWaiting flag
+  -- never sees them and each one parks on a button.  Boxes carrying a
+  -- `choice` are skipped whole -- walking a yes/no's pages is LEARN TEXT's
+  -- job, and only for the learn prompt.
+  local function battleBoxWaiting(game, battle)
+    if not battle or battle.demo then return false end
+    local stack = game and game.stack
+    local top = stack and type(stack.top) == "function" and stack:top() or nil
+    if not isTextBox(top) then return false end
+    if rawget(top, "choice") ~= nil then return false end
+    return textBoxBlocked(top)
+  end
+
   -- The learn-a-move prompt is one TextBox holding several pages that ends in
   -- a YES/NO.  `waiting` is true only between pages; the frame the last page
   -- finishes the box sets `done` and pushes the ChoiceBox itself.  Advancing
@@ -153,6 +193,7 @@ return function(mod, suite)
         and type(commandMenu.textWaiting) == "function"
         and commandMenu.textWaiting(game, battle)
       if waiting then return "text", cfg end
+      if battleBoxWaiting(game, battle) then return "text", cfg end
     end
     return nil, cfg
   end
@@ -269,8 +310,9 @@ return function(mod, suite)
         id = "battleText.autoText",
         label = "AUTO TEXT",
         value = function() return config().autoText and "ON" or "OFF" end,
-        help = "Advances battle messages for you. Menus, move select and "
-          .. "yes/no prompts stay under your control.",
+        help = "Advances battle messages for you, including the ones that "
+          .. "follow learning a move. Menus, move select and yes/no prompts "
+          .. "stay under your control.",
         step = function()
           local cfg = config()
           cfg.autoText = not cfg.autoText
@@ -380,6 +422,7 @@ return function(mod, suite)
   end)
 
   shared.battleText = {
+    battleBoxWaiting = battleBoxWaiting,
     config = config,
     isLevelUpStatBox = isLevelUpStatBox,
     isLevelUpSfxItem = isLevelUpSfxItem,
@@ -390,5 +433,6 @@ return function(mod, suite)
     pending = pending,
     skipLevelUpSfx = skipLevelUpSfx,
     speeds = SPEEDS,
+    textBoxBlocked = textBoxBlocked,
   }
 end

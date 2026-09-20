@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.9.1] - 2026-09-20
+
+### Fixed
+
+- **AUTO TEXT left several battle messages waiting for a button**, most
+  noticeably after learning a move: "1, 2 and…", " Poof!", "… forgot …! And…"
+  and "… learned …!" each stopped for an A press, as did "… did not learn …!"
+  and "HM techniques can't be deleted!". Those messages are drawn in their own
+  window pushed over the battle rather than by the battle's own message queue,
+  which was the only thing AUTO TEXT watched. It now advances both. Yes/no
+  prompts, move selection and menus are still entirely yours — advancing the
+  pages of the learn-a-move prompt remains LEARN TEXT's separate opt-in.
+
 ## [1.9.0] - 2026-09-20
 
 ### Added

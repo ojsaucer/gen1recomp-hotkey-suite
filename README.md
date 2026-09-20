@@ -43,7 +43,7 @@ Each module below has its own **ENABLED** master switch (**OFF** by default).
 - **UI Layout & Scale:** Choose `AUTO`, `GRID 2x2`, or `LIST 1x4`, with scales from 50% to 150%. The legend anchors to the playfield and shrinks to fit, so it stays on screen even in portrait on mobile.
 
 ### 💬 Battle Text
-- **Auto Text:** Automatically advances battle messages at a configurable speed (`Slow`, `Medium`, `Fast`, `Very Fast`) while leaving menus, move selection, and yes/no prompts fully under your control.
+- **Auto Text:** Automatically advances battle messages at a configurable speed (`Slow`, `Medium`, `Fast`, `Very Fast`) while leaving menus, move selection, and yes/no prompts fully under your control. This includes the messages that run on their own window over the battle, such as the "1, 2 and… Poof!" sequence after a move is forgotten.
 - **Level Up:** Also dismisses the level-up stat window automatically.
 - **Skip Lv SFX:** Skips the level-up fanfare and the one for learning a new move, removing the pause the game takes to play them. Fanfares for catching a Pokémon, new Pokédex entries, and winning a battle are untouched.
 - **Learn Text:** When a Pokémon with four moves learns a new one, advances the pages in front of the "delete an older move?" prompt and stops at the YES/NO. The choice is always left to you.
