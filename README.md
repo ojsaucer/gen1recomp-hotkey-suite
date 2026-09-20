@@ -69,10 +69,21 @@ Each module below has its own **ENABLED** master switch (**OFF** by default).
 
 ## Installation
 
-1. Download the latest `hotkey_suite.zip` from [Releases](https://github.com/ojsaucer/gen1recomp-hotkey-suite/releases).
-2. Place the `hotkey_suite` folder into your `mods/` directory.
+1. Download the latest `hotkey_suite-<version>.zip` from [Releases](https://github.com/ojsaucer/gen1recomp-hotkey-suite/releases).
+2. Create a `hotkey_suite` folder inside your `mods/` directory and extract the archive into it. The archive is flat, so `manifest.json` and `main.lua` must end up directly inside `mods/hotkey_suite/`.
 3. Enable **Hotkey Suite** in the launcher, then open **OPTIONS > HOTKEY SUITE**.
 4. Pick an input type, open a module, switch **ENABLED** to **ON**, and assign your hotkeys.
+
+### Updating
+
+From 1.7.2 onward the mod declares its repository in the manifest, so the
+launcher's MODS panel can update it for you: **Update** installs the newest
+release and **Versions** lets you roll to any published release.
+
+> **Upgrading from 1.7.1 or earlier?** Install 1.7.2 by hand once. The launcher
+> reads the repository field from the copy you already have installed, and
+> builds before 1.7.2 don't have one — so they can't offer themselves an
+> update. After 1.7.2 is in place, updating works from the launcher.
 
 ---
 

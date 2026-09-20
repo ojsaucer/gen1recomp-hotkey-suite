@@ -1,5 +1,37 @@
 # Changelog
 
+## [1.7.2] - 2026-09-19
+
+### Fixed
+
+- **The launcher could not update the mod.** The manifest was missing the
+  optional `github` field, and the engine treats an absent value as "no
+  auto-update UI for this mod" — so the MODS panel showed neither **Update**
+  nor **Versions**. The manifest now declares
+  `"github": "ojsaucer/gen1recomp-hotkey-suite"`, which points the launcher at
+  this repository's GitHub Releases.
+- **Release archives had the wrong shape.** Every file was nested inside a
+  `hotkey_suite/` folder, but the launcher's **Import mod .zip**, **Update**
+  and **Versions** paths all install archives whose files sit at the *archive
+  root*. Release assets are now built flat and follow the engine's naming
+  convention, `hotkey_suite-<version>.zip`.
+
+### Added
+
+- A ready-to-use GitHub Actions release workflow (`release.yml`) that
+  validates the manifest, checks every Lua file's syntax, builds the
+  root-level archive, excludes `tests/`, and publishes the tagged release. It
+  is provided alongside this release rather than committed, because adding a
+  workflow file requires a token scope this project's automation doesn't hold.
+
+### Upgrade note
+
+Because the launcher reads the `github` field from the copy of the mod you
+already have installed, **this one update must be installed by hand** — the
+installed 1.7.1 has no such field and so cannot offer itself an update. Install
+1.7.2 once (extract `hotkey_suite-1.7.2.zip` into `mods/hotkey_suite/`), and
+**Update** / **Versions** will work from then on.
+
 ## [1.7.1] - 2026-09-19
 
 ### Fixed
