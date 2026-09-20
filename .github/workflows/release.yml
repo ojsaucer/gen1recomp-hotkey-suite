@@ -1,0 +1,122 @@
+name: Build and release mod
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hotkey-suite-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate manifest and version
+        id: metadata
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          manifest = json.loads(Path("manifest.json").read_text(encoding="utf-8"))
+          version = str(manifest.get("version", ""))
+          if not re.fullmatch(r"(?:0|[1-9]\d*)\.\d+\.\d+", version):
+              raise SystemExit(f"manifest version is not semver: {version!r}")
+          if manifest.get("id") != "hotkey_suite":
+              raise SystemExit("manifest id must remain hotkey_suite")
+          if manifest.get("github") != "ojsaucer/gen1recomp-hotkey-suite":
+              raise SystemExit("manifest github field must point at this repo")
+          Path(".release-version").write_text(version + "\n", encoding="utf-8")
+          PY
+          VERSION="$(cat .release-version)"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "asset=hotkey_suite-$VERSION.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Validate Lua syntax
+        run: |
+          find . -name '*.lua' -not -path './.git/*' -print0 \
+            | xargs -0 -n1 npx --yes luaparse -q
+
+      - name: Build launcher-ready archive
+        env:
+          ASSET: ${{ steps.metadata.outputs.asset }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import zipfile
+          from pathlib import Path
+
+          asset = os.environ["ASSET"]
+          source = Path(".")
+          skip_dirs = {".git", ".github", "tests"}
+
+          paths = []
+          for path in sorted(source.rglob("*")):
+              if not path.is_file():
+                  continue
+              parts = path.relative_to(source).parts
+              if parts[0] in skip_dirs or parts[0] == ".release-version":
+                  continue
+              paths.append(path)
+
+          # Files land at the archive ROOT: the layout the launcher's
+          # Import mod .zip / Update / Versions paths install.
+          with zipfile.ZipFile(asset, "w", zipfile.ZIP_DEFLATED,
+                               compresslevel=9) as archive:
+              for path in paths:
+                  archive.write(path, path.relative_to(source).as_posix())
+
+          with zipfile.ZipFile(asset) as archive:
+              names = set(archive.namelist())
+              missing = {"manifest.json", "main.lua"} - names
+              if missing:
+                  raise SystemExit(f"archive is missing {sorted(missing)}")
+              if any(name.startswith("tests/") for name in names):
+                  raise SystemExit("archive must not ship tests/")
+              manifest = json.loads(archive.read("manifest.json"))
+              expected = asset[len("hotkey_suite-"):-len(".zip")]
+              if manifest.get("version") != expected:
+                  raise SystemExit("archive manifest version does not match its filename")
+          PY
+
+      - name: Create version tag if needed
+        env:
+          TAG: ${{ steps.metadata.outputs.tag }}
+        run: |
+          git fetch --tags --force
+          if git show-ref --tags --verify --quiet "refs/tags/$TAG"; then
+            echo "$TAG already exists; keeping the existing tag."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "Hotkey Suite ${TAG#v}"
+            git push origin "$TAG"
+          fi
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.metadata.outputs.tag }}
+          ASSET: ${{ steps.metadata.outputs.asset }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ASSET" --clobber
+          else
+            gh release create "$TAG" "$ASSET" \
+              --title "Hotkey Suite ${TAG#v}" \
+              --notes "See CHANGELOG.md for details."
+          fi
