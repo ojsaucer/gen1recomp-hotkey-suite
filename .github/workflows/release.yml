@@ -25,7 +25,7 @@ jobs:
         id: metadata
         shell: bash
         run: |
-          python - <<'PY'
+          python3 - <<'PY'
           import json
           import re
           from pathlib import Path
@@ -36,6 +36,9 @@ jobs:
               raise SystemExit(f"manifest version is not semver: {version!r}")
           if manifest.get("id") != "hotkey_suite":
               raise SystemExit("manifest id must remain hotkey_suite")
+          # The launcher reads this field to offer Update / Versions.  An
+          # absent or malformed value silently disables auto-update, so it is
+          # worth failing the build over.
           if manifest.get("github") != "ojsaucer/gen1recomp-hotkey-suite":
               raise SystemExit("manifest github field must point at this repo")
           Path(".release-version").write_text(version + "\n", encoding="utf-8")
@@ -45,16 +48,35 @@ jobs:
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "asset=hotkey_suite-$VERSION.zip" >> "$GITHUB_OUTPUT"
 
-      - name: Validate Lua syntax
+      - name: Install Lua 5.1
         run: |
-          find . -name '*.lua' -not -path './.git/*' -print0 \
-            | xargs -0 -n1 npx --yes luaparse -q
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.1
+
+      - name: Validate Lua syntax
+        shell: bash
+        run: |
+          # Use the real Lua 5.1 compiler rather than a JS reimplementation:
+          # it is the same parser the engine will hold these files to.
+          status=0
+          while IFS= read -r -d '' file; do
+            if ! output="$(luac5.1 -p "$file" 2>&1)"; then
+              echo "::error file=${file#./}::${output}"
+              status=1
+            fi
+          done < <(find . -name '*.lua' -not -path './.git/*' -print0)
+          if [ "$status" -ne 0 ]; then
+            echo "Lua syntax validation failed."
+            exit 1
+          fi
+          echo "All Lua files parse cleanly."
 
       - name: Build launcher-ready archive
+        shell: bash
         env:
           ASSET: ${{ steps.metadata.outputs.asset }}
         run: |
-          python - <<'PY'
+          python3 - <<'PY'
           import json
           import os
           import zipfile
@@ -62,14 +84,14 @@ jobs:
 
           asset = os.environ["ASSET"]
           source = Path(".")
-          skip_dirs = {".git", ".github", "tests"}
+          skip = {".git", ".github", "tests", ".release-version"}
 
           paths = []
           for path in sorted(source.rglob("*")):
               if not path.is_file():
                   continue
               parts = path.relative_to(source).parts
-              if parts[0] in skip_dirs or parts[0] == ".release-version":
+              if parts[0] in skip:
                   continue
               paths.append(path)
 
@@ -87,13 +109,33 @@ jobs:
                   raise SystemExit(f"archive is missing {sorted(missing)}")
               if any(name.startswith("tests/") for name in names):
                   raise SystemExit("archive must not ship tests/")
+              if any("/" in name and name.split("/")[0] == "hotkey_suite"
+                     for name in names):
+                  raise SystemExit("archive must be flat, not nested in a folder")
               manifest = json.loads(archive.read("manifest.json"))
               expected = asset[len("hotkey_suite-"):-len(".zip")]
               if manifest.get("version") != expected:
                   raise SystemExit("archive manifest version does not match its filename")
+              print(f"{asset}: {len(names)} files, flat, version {expected}")
           PY
 
-      - name: Create version tag if needed
+      - name: Skip if this version is already released
+        id: check
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.metadata.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "$TAG is already released; bump manifest.json to publish a new one."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create version tag
+        if: steps.check.outputs.publish == 'true'
+        shell: bash
         env:
           TAG: ${{ steps.metadata.outputs.tag }}
         run: |
@@ -107,16 +149,14 @@ jobs:
             git push origin "$TAG"
           fi
 
-      - name: Create or update GitHub release
+      - name: Create GitHub release
+        if: steps.check.outputs.publish == 'true'
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.metadata.outputs.tag }}
           ASSET: ${{ steps.metadata.outputs.asset }}
         run: |
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$ASSET" --clobber
-          else
-            gh release create "$TAG" "$ASSET" \
-              --title "Hotkey Suite ${TAG#v}" \
-              --notes "See CHANGELOG.md for details."
-          fi
+          gh release create "$TAG" "$ASSET" \
+            --title "Hotkey Suite ${TAG#v}" \
+            --notes "See CHANGELOG.md for details."
