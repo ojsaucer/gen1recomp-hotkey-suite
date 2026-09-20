@@ -39,10 +39,13 @@ Each module below has its own **ENABLED** master switch (**OFF** by default).
 - **Command Mode:** Hold a hotkey and press D-Pad / Direction keys (`Up`, `Right`, `Left`, `Down`) to directly select **FIGHT**, **PKMN**, **ITEM**, or **RUN**—or choose moves 1–4.
 - **Instant Run:** Dedicated hotkey to attempt fleeing directly from the main battle menu.
 - **Custom Battle UI Compatible:** Automatically adapts to modded battle UIs (e.g. Floating Battle HUD, Voxel Ascendant) with a floating directional legend and real move names.
+- **Move Info:** Optionally adds a second line to each move showing its attack power beside a sword icon, its type abbreviated to three characters, and its accuracy as `##%`.
+- **UI Layout & Scale:** Choose `AUTO`, `GRID 2x2`, or `LIST 1x4`, with scales from 50% to 150%. The legend anchors to the playfield and shrinks to fit, so it stays on screen even in portrait on mobile.
 
 ### 💬 Battle Text
 - **Auto Text:** Automatically advances battle messages at a configurable speed (`Slow`, `Medium`, `Fast`, `Very Fast`) while leaving menus, move selection, and yes/no prompts fully under your control.
 - **Level Up:** Also dismisses the level-up stat window automatically.
+- **Skip Lv SFX:** Skips the level-up fanfare, removing the pause the game takes to play it. Fanfares for catching a Pokémon, new Pokédex entries, and learning moves are untouched.
 
 ### 🔴 Ball Menu
 - **Ball Menu:** Battle-only hotkey opening a compact **single-line** selector. Cycle ball types with Left/Right, throw with `A`, cancel with `B`.

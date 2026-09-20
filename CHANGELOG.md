@@ -1,5 +1,45 @@
 # Changelog
 
+## [1.8.0] - 2026-09-19
+
+### Added
+
+- **Move info in the battle command menu.** A new **MOVE INFO** setting adds a
+  second line to each move in the custom legend showing its attack power next
+  to a sword icon, its type abbreviated to three characters, and its accuracy
+  as `##%`. Status moves show `--` for power, and moves that never miss show
+  `--%`. Types added by other mods are read through the engine's type chart,
+  so they display their own names rather than a blank.
+- **UI LAYOUT for the battle command menu.** The legend can now be forced to
+  `GRID 2x2` or `LIST 1x4` instead of `AUTO`. `AUTO` keeps the compact grid
+  when there is room for it and drops to a single column when the grid would
+  otherwise have to shrink to stay on screen.
+- **SKIP LV SFX in the Battle Text module.** An On/Off setting that skips the
+  level-up fanfare during battle. The fanfare is one of the sounds the game
+  blocks on, so skipping it removes the pause that comes with every level-up.
+  Only the level-up jingle is affected — the fanfares for catching a Pokémon,
+  filling a Pokédex page and learning a move all still play normally.
+
+### Fixed
+
+- **The battle command menu could be drawn off-screen in portrait.** The
+  legend was positioned against the *window* rather than the *playfield*. On a
+  phone held upright the window is far taller than the game's 10:9 frame, so
+  bottom-anchored legends landed in the letterbox below the game and
+  right-anchored ones could sit outside it entirely. The legend now anchors to
+  the playfield, and its scale is clamped against both the available width and
+  the available height, so it stays inside the frame at every anchor, scale
+  and layout.
+- **UI SCALE offers smaller steps.** The scale list gains 50%, 60% and 90%,
+  and the automatic floor drops from 50% to 25%, which gives small or portrait
+  screens enough room to show the new move info line.
+
+### Note
+
+As with every other option in this suite, **MOVE INFO and SKIP LV SFX ship
+turned off**, and `UI LAYOUT` defaults to `AUTO`. Nothing changes until you
+turn it on.
+
 ## [1.7.2] - 2026-09-19
 
 ### Fixed

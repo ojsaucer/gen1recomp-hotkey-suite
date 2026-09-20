@@ -31,6 +31,7 @@ return function(mod, suite)
     if cfg.enabled == nil then cfg.enabled = false end
     if cfg.autoText == nil then cfg.autoText = false end
     if cfg.levelUp == nil then cfg.levelUp = false end
+    if cfg.skipLevelUpSfx == nil then cfg.skipLevelUpSfx = false end
     cfg.speed = tonumber(cfg.speed)
     if not cfg.speed or cfg.speed % 1 ~= 0 or not SPEEDS[cfg.speed] then
       cfg.speed = 2
@@ -104,8 +105,47 @@ return function(mod, suite)
     return nil, cfg
   end
 
+  -- The level-up fanfare is queued by BattleState:sayNextAutoWaitSfx, the only
+  -- engine caller that sets BOTH `auto` and `waitForLearningSfx` -- every
+  -- other blocking fanfare (caught mon, dex page, learned move) goes through
+  -- sayNextWaitSfx and carries no `auto`.  That pairing is what identifies the
+  -- "grew to level N!" row without naming anything private.
+  local function isLevelUpSfxItem(item)
+    return type(item) == "table" and item.auto == true
+      and type(item.waitForLearningSfx) == "function"
+  end
+
+  -- Claiming the row's sound before updateQueue reaches it means the fanfare
+  -- is never started, so WaitForSoundToFinish never blocks: the page then
+  -- falls through to the normal `auto` branch and the queue carries on.
+  local function skipLevelUpSfx(game)
+    local cfg = config()
+    if not (cfg.enabled and cfg.skipLevelUpSfx) then return end
+    local battle = battleState(game)
+    if not battle then return end
+    local current = battle.current
+    if isLevelUpSfxItem(current) and not current.soundStarted then
+      current.soundStarted = true
+    end
+    for _, item in ipairs(battle.queue or {}) do
+      if isLevelUpSfxItem(item) and not item.soundStarted then
+        item.soundStarted = true
+      end
+    end
+    -- Already sounding (the row became current and finished printing inside a
+    -- single step): cut it short and release the queue's hold.
+    if battle.waitingSound and isLevelUpSfxItem(current) then
+      local src = battle.waitingSound
+      if type(src) == "table" or type(src) == "userdata" then
+        pcall(function() if src.stop then src:stop() end end)
+      end
+      battle.waitingSound, battle.waitSoundLeft = nil, nil
+    end
+  end
+
   mod.hooks:wrap("input.step", function(next, game, dt)
     next(game, dt)
+    skipLevelUpSfx(game)
     local kind, cfg = pending(game)
     if not kind then
       timer = 0
@@ -167,6 +207,28 @@ return function(mod, suite)
         end,
       },
       {
+        id = "battleText.skipLevelUpSfx",
+        label = "SKIP LV SFX",
+        value = function()
+          return config().skipLevelUpSfx and "ON" or "OFF"
+        end,
+        help = "Silences the level-up jingle. The battle waits for that "
+          .. "fanfare to finish before it carries on, so skipping it removes "
+          .. "the pause as well.",
+        step = function()
+          local cfg = config()
+          cfg.skipLevelUpSfx = not cfg.skipLevelUpSfx
+          save(cfg)
+          return true
+        end,
+        unassign = function()
+          local cfg = config()
+          cfg.skipLevelUpSfx = false
+          save(cfg)
+          return true
+        end,
+      },
+      {
         id = "battleText.speed",
         label = "SPEED",
         value = function() return SPEEDS[config().speed].label end,
@@ -194,13 +256,16 @@ return function(mod, suite)
     cfg.enabled = false
     cfg.autoText = false
     cfg.levelUp = false
+    cfg.skipLevelUpSfx = false
     save(cfg)
   end)
 
   shared.battleText = {
     config = config,
     isLevelUpStatBox = isLevelUpStatBox,
+    isLevelUpSfxItem = isLevelUpSfxItem,
     pending = pending,
+    skipLevelUpSfx = skipLevelUpSfx,
     speeds = SPEEDS,
   }
 end
