@@ -51,13 +51,20 @@
     `World:busy()` — which accounts for the script VM, map setup, text and
     choice boxes, field-move tails, fishing and headbutt — rather than
     re-deriving a narrower answer.
-  - Gold's start-menu rows are data, dispatched by id, and carry no function to
-    call; the suite kept only rows that carried one, so it kept none. It now
-    opens a row through the engine's own dispatch, and labels the STATUS row
-    with the player's name as Gold does.
+  - Gold's start-menu rows are data, and carry no function to call; the suite
+    kept only rows that carried one, so it kept none. It now opens a row
+    through the engine's own dispatch. The row's id arrives as its `value` —
+    the rows the engine hands a mod are built fresh for display and have no
+    `id` field at all, so keying on `id` dropped every one of them.
+    SAVE, POKEDEX, POKEMON, PACK, POKEGEAR, STATUS, OPTION and MODS are all
+    bindable. QUIT is deliberately not: Gold confirms it inside the menu, and
+    dispatching it directly would skip that prompt and discard unsaved play.
   - Gold's battle screen holds its fighter one level down, names the move list
     `moves`, and keeps no data table of its own, so every readiness check
-    failed. Those three reads now go through the adapter.
+    failed. Those reads now go through the adapter. Gold also keeps the
+    fighter's HP on the fighter itself where Gen 1 nests it one level deeper;
+    because the command and ball menus gate on HP and the move menu does not,
+    the move menu worked on Gold while those two stayed dead.
 
 ### Known limitations on Gen 2
 

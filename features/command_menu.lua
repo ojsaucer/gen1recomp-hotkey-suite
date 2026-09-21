@@ -89,9 +89,8 @@ return function(mod, suite)
   local function commandReady(battle)
     if not shared.battle.commandMenuOpen(battle) then return false end
     if battle.safari then return (battle.safari.balls or 0) > 0 end
-    local fighter = shared.battle.fighter(battle)
-    local mon = fighter and fighter.mon
-    if not mon or (mon.hp or 0) <= 0 then return false end
+    local hp = shared.battle.fighterHp(battle)
+    if not hp or hp <= 0 then return false end
     return true
   end
 

@@ -182,6 +182,18 @@ return function(mod, suite)
     return nil
   end
 
+  -- Red wraps the party mon in .mon and reads hp off that; Gold's fighter
+  -- carries its own hp (src/battle/gen2/Battle.lua:671 reads self.player.hp).
+  -- This is the single read that let Gold's move menu work while the command
+  -- menu and the ball menu stayed dead: they are the two that gate on HP.
+  function battle.fighterHp(b)
+    local fighter = battle.fighter(b)
+    if not fighter then return nil end
+    local mon = fighter.mon
+    if type(mon) == "table" then return tonumber(mon.hp) end
+    return tonumber(fighter.hp)
+  end
+
   function battle.moves(b)
     local fighter = battle.fighter(b)
     if not fighter then return nil end
@@ -261,18 +273,36 @@ return function(mod, suite)
 
   -- ------------------------------------------------------------ the start menu
   --
-  -- Gen 1's rows carry the function that opens them.  Gold's are pure data --
-  -- { id, label, need, desc } -- and it dispatches by id through
-  -- Game2:openStartMenuItem (src/core/Game2.lua:449), which is the same entry
-  -- point the compat layer synthesises a row's onChoose from.  Requiring a
-  -- callable therefore dropped every Gold row on the floor, which emptied the
-  -- menu hotkeys and the radial that is built from the same list.
+  -- Gen 1's rows carry the function that opens them.  Gold's are pure data,
+  -- and not the ITEMS entries either: visibleItems() builds a fresh row per
+  -- visible item (src/ui/gen2/StartMenu.lua:197-230), so the id arrives as
+  -- `value` and there is no `id` field at all.  Requiring a callable dropped
+  -- every Gold row, which emptied the menu hotkeys and the radial built from
+  -- the same list.  Dispatch goes through Game2:openStartMenuItem
+  -- (src/core/Game2.lua:449), the same entry point Gold's own menu reaches
+  -- through onChoose.
   local menu = {}
+
+  -- QUIT and the Bug Contest's QUIT never reach onChoose: StartMenu:choose
+  -- handles them itself by raising a confirmation first (StartMenu.lua:256-268).
+  -- Dispatching them directly would skip that prompt, and for QUIT that means
+  -- throwing away everything since the last save on a single keypress.
+  local MENU_NOT_DISPATCHABLE = { quit = true, quitContest = true }
+
+  function menu.dispatchId(item)
+    if type(item) ~= "table" then return nil end
+    local id = item.value
+    if id == nil then id = item.id end
+    if id == nil then return nil end
+    id = tostring(id)
+    if MENU_NOT_DISPATCHABLE[id] then return nil end
+    return id
+  end
 
   function menu.activator(game, item)
     local direct = item.onSelect or item.activate or item.action or item.select
     if type(direct) == "function" then return direct end
-    local id = item.id
+    local id = menu.dispatchId(item)
     if id == nil then return nil end
     if type(game) ~= "table" or type(game.openStartMenuItem) ~= "function" then
       return nil
@@ -286,18 +316,13 @@ return function(mod, suite)
     end
   end
 
-  -- Gold builds the player's name into the STATUS row when it lays the menu
-  -- out, so the row itself carries label = nil.  Falling through to the id
-  -- would label it "status" in the suite's own lists.
+  -- Gold has already substituted the player's name into the STATUS row and
+  -- applied every `need` gate before the hook is raised, so a row that gets
+  -- this far is one the player may use, labelled the way Gold labels it.
   function menu.label(game, item, index)
     local label = item.label or item.name
     if label ~= nil and tostring(label) ~= "" then return tostring(label) end
-    if tostring(item.id or "") == "status" then
-      local player = game and game.save and game.save.player
-      local name = player and player.name
-      if name ~= nil and tostring(name) ~= "" then return tostring(name) end
-    end
-    return tostring(item.id or ("ITEM " .. index))
+    return tostring(menu.dispatchId(item) or item.id or ("ITEM " .. index))
   end
 
   shared.menu = menu

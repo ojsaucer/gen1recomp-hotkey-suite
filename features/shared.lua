@@ -710,8 +710,11 @@ return function(mod, suite)
   }
 
   local function stableMenuId(game, item, index)
-    if item.id then
-      local id = tostring(item.id)
+    -- Gen 1 rows identify themselves with `id`; Gold's carry it as `value`.
+    local raw = item.id
+    if raw == nil then raw = item.value end
+    if raw ~= nil then
+      local id = tostring(raw)
       return MENU_ID_ALIASES[id] or id
     end
     local label = tostring(item.label or item.name or "")
