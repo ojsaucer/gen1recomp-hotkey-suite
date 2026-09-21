@@ -83,19 +83,11 @@ return function(mod, suite)
   end
 
   local function battleState(game)
-    local states = game and game.stack and game.stack.states
-    for i = #(states or {}), 1, -1 do
-      local state = states[i]
-      if type(state) == "table"
-          and (state.isBattle or state.isBattleState
-            or type(state.chooseMenu) == "function") then
-        return state
-      end
-    end
+    return shared.battle.find(game)
   end
 
   local function commandReady(battle)
-    if not battle or battle.phase ~= "menu" or battle.demo then return false end
+    if not shared.battle.commandMenuOpen(battle) then return false end
     if battle.safari then return (battle.safari.balls or 0) > 0 end
     local player = battle.player
     if not player or not player.mon or player.mon.hp <= 0 then return false end
@@ -103,7 +95,7 @@ return function(mod, suite)
   end
 
   local function moveReady(battle)
-    return battle and battle.phase == "moveSelect"
+    return shared.battle.moveSelectOpen(battle)
       and battle.player and type(battle.player.curMoves) == "table"
       and not battle.moveSwapIndex
   end
@@ -221,16 +213,18 @@ return function(mod, suite)
   -- push their own screen on top, so they stay under manual control.
   local function textWaiting(game, battle)
     if not battle then return false end
-    if battle.demo then return false end
+    if shared.battle.scripted(battle) then return false end
     local stack = game and game.stack
     if not stack or type(stack.top) ~= "function" then return false end
     if stack:top() ~= battle then return false end
-    if battle.phase == "menu" or battle.phase == "moveSelect"
-        or battle.phase == "mimicSelect" then
+    if battle.phase == "menu" or shared.battle.moveSelectOpen(battle) then
       return false
     end
-    return battle.msgWaiting == true or battle.msgPrompt == true
-      or battle.waitingForInput == true
+    -- Gold's forget prompt is a phase on the battle screen rather than a
+    -- pushed choice box, so it has to be excluded here to stay under manual
+    -- control the way Red's pushed prompts already are.
+    if shared.battle.learnChoiceOpen(battle) then return false end
+    return shared.battle.textWaiting(battle)
   end
 
   -- A sword drawn from rectangles rather than a charmap glyph: the Gen 1

@@ -1,10 +1,62 @@
 local OptionsMenu = require("src.ui.OptionsMenu")
-local OptionRows = require("src.ui.OptionRows")
 local Font = require("src.render.Font")
+local Marquee = require("src.ui.Marquee")
 local PaletteFX = require("src.render.PaletteFX")
 local Screens = require("src.ui.Screens")
 local Strings = require("src.core.Strings")
 local TextBox = require("src.render.TextBox")
+local Theme = require("src.ui.Theme")
+
+-- src.ui.OptionRows is a Gen 1 only module with no Gen 2 adapter, so requiring
+-- it would keep the whole suite off Gold.  It is a small leaf that depends on
+-- nothing generation-specific (Font, Marquee, Theme are shared), so the two
+-- entry points the settings screen uses are vendored here verbatim instead.
+local OptionRows = { VISIBLE = 4 }
+
+-- Font.drawBox(0, y, 20, 4) spends column 19 on the frame, so a line drawn to
+-- the 160px screen edge prints over its own border.
+local CONTENT_RIGHT = 152
+local function fits(x) return math.floor((CONTENT_RIGHT - x) / 8) end
+
+function OptionRows.clampScroll(index, scroll, total)
+  if index <= scroll then
+    return index - 1
+  elseif index > scroll + OptionRows.VISIBLE then
+    return index - OptionRows.VISIBLE
+  end
+  return scroll
+end
+
+function OptionRows.draw(game, rows, index, scroll)
+  love.graphics.setColor(1, 1, 1, 1)
+  love.graphics.rectangle("fill", 0, 0, 160, 144)
+  for slot = 1, OptionRows.VISIBLE do
+    local i = scroll + slot
+    local row = rows[i]
+    if not row then break end
+    Font.drawBox(0, (slot - 1) * 4, 20, 4)
+    love.graphics.setColor(0, 0, 0, 1)
+    local label = row.label or ""
+    local value = row.value and row.value(game) or ""
+    if i == index then
+      local key = tostring(row.id or row.label) .. "\0" .. tostring(value)
+      label = Marquee.scroll(label, fits(16), key)
+      value = Marquee.scroll(value, fits(24), key)
+    else
+      label = Marquee.clip(label, fits(16))
+      value = Marquee.clip(value, fits(24))
+    end
+    Font.draw(label, 16, ((slot - 1) * 4 + 1) * 8)
+    Font.draw(value, 24, ((slot - 1) * 4 + 2) * 8)
+    if i == index then
+      Font.drawCode(Theme.cursor, 8, ((slot - 1) * 4 + 1) * 8)
+    end
+  end
+  if scroll + OptionRows.VISIBLE < #rows then
+    Font.drawCode(Theme.moreArrow, 144, 128)
+  end
+  love.graphics.setColor(1, 1, 1, 1)
+end
 
 local INPUTS = {
   { id = "keyboard", label = "KEYBOARD" },
@@ -225,6 +277,7 @@ return function(mod)
   })
 
   suite.load("features/shared.lua")
+  suite.load("features/gen.lua")
   suite.load("features/autofire.lua")
   suite.load("features/menu_hotkeys.lua")
   suite.load("features/radial.lua")

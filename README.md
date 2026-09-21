@@ -1,6 +1,6 @@
 # Hotkey Suite for Gen1Recomp
 
-A modular accessibility and input suite for **Keyboard** and **Gamepad** in Pokémon Red, Blue, and Yellow.
+A modular accessibility and input suite for **Keyboard** and **Gamepad** in Pokémon Red, Blue, Yellow, Gold, Silver, and Crystal.
 
 Configure everything from one place:  
 `OPTIONS > HOTKEY SUITE`
@@ -67,6 +67,7 @@ Each module below has its own **ENABLED** master switch (**OFF** by default).
 
 ## Compatibility
 
+- Runs on both generations. Every module works on Gold, Silver, and Crystal as it does on Red, Blue, and Yellow, and your settings and bindings are shared between them. The one exception is the **FLY** travel hotkey: the engine does not expose FLY to mods on Gen 2 yet, so that row reads `UNSUPPORTED` there instead of taking a binding that could never fire. RETURN CENTER and BICYCLE work in both.
 - Works alongside custom battle UI mods (Floating Battle HUD, Voxel Ascendant, Kanto Ascendant): the Battle Command Menu detects modded battle layouts and draws a floating legend with real move names instead of fighting for the vanilla cursor.
 
 ---

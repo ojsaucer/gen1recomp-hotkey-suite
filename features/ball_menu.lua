@@ -43,27 +43,22 @@ return function(mod, suite)
   local function save(cfg) shared.store.set("ballMenu", cfg) end
 
   local function battleState(game)
-    local states = game and game.stack and game.stack.states
-    for i = #(states or {}), 1, -1 do
-      local state = states[i]
-      if type(state) == "table"
-          and (state.isBattle or state.isBattleState
-            or type(state.chooseMenu) == "function") then
-        return state
-      end
-    end
+    return shared.battle.find(game)
   end
 
   local function commandReady(battle)
-    if not battle or battle.phase ~= "menu" or battle.demo then return false end
+    if not shared.battle.commandMenuOpen(battle) then return false end
     if battle.safari then return (battle.safari.balls or 0) > 0 end
     local player = battle.player
     if not player or not player.mon or player.mon.hp <= 0 then return false end
     return true
   end
 
-  local function isBall(id)
+  local function isBall(id, battle)
     if not id then return false end
+    -- Gold tags every ball with the BALL pocket, which is exact where a name
+    -- list is only as good as its last update.
+    if battle and shared.battle.pocketIsBall(battle, id) then return true end
     if ItemEffects and type(ItemEffects.isBall) == "function" then
       local ok, res = pcall(ItemEffects.isBall, id)
       if ok and res then return true end
@@ -81,6 +76,18 @@ return function(mod, suite)
   local function getAvailableBalls(battle)
     local balls = {}
     if not battle then return balls end
+    local contest = shared.battle.contestBalls(battle)
+    if contest then
+      if contest.count > 0 then
+        balls[#balls + 1] = {
+          id = contest.id,
+          name = getBallName(battle.game and battle.game.data or battle.data,
+            contest.id),
+          count = contest.count,
+        }
+      end
+      return balls
+    end
     if battle.safari then
       local count = battle.safari.balls or 0
       if count > 0 then
@@ -97,7 +104,7 @@ return function(mod, suite)
     local order = Bag and Bag.order and Bag.order(saveObj) or saveObj.bagOrder or {}
     local seen = {}
     for _, id in ipairs(order) do
-      if isBall(id) and not seen[id] then
+      if isBall(id, battle) and not seen[id] then
         seen[id] = true
         local count = saveObj.inventory[id] or 0
         if count > 0 then
@@ -110,7 +117,7 @@ return function(mod, suite)
       end
     end
     for id, count in pairs(saveObj.inventory) do
-      if isBall(id) and not seen[id] and count > 0 then
+      if isBall(id, battle) and not seen[id] and count > 0 then
         seen[id] = true
         balls[#balls + 1] = {
           id = id,
@@ -124,6 +131,15 @@ return function(mod, suite)
 
   local function executeThrow(battle, ballId)
     if not battle then return false end
+    -- Gold has no throwBall.  BattleState:useItem is its single entry point
+    -- and already owns the trainer-battle refusal, the full-box gate, the
+    -- catch roll and spending the ball (or decrementing the contest counter),
+    -- so none of Red's state-machine setup below applies here -- and spending
+    -- the ball a second time would charge the player twice for one throw.
+    if shared.battle.usesEngineItemPath(battle) then
+      if not ballId then return false end
+      return shared.battle.throwBall(battle, ballId)
+    end
     if battle.safari then
       if (battle.safari.balls or 0) <= 0 then
         battle.phase = "messages"

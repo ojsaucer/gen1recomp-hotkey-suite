@@ -697,13 +697,25 @@ return function(mod, suite)
     return values[((index - 1 + (dir or 1)) % #values) + 1]
   end
 
+  -- Gold's start-menu rows carry explicit ids where Gen 1's are derived from
+  -- their labels, and three of them name the same menu differently.  Folding
+  -- those onto the Gen 1 spelling keeps a saved binding working when the same
+  -- installation launches the other generation, since settings are stored per
+  -- installation rather than per save.
+  local MENU_ID_ALIASES = {
+    pack = "item", option = "options", status = "trainer_card",
+  }
+
   local function stableMenuId(game, item, index)
-    if item.id then return tostring(item.id) end
+    if item.id then
+      local id = tostring(item.id)
+      return MENU_ID_ALIASES[id] or id
+    end
     local label = tostring(item.label or item.name or "")
     local upper = label:upper()
     if upper:find("DEX", 1, true) then return "pokedex" end
     if upper:find("MON", 1, true) then return "pokemon" end
-    if upper == "ITEM" or upper == "BAG" then return "item" end
+    if upper == "ITEM" or upper == "BAG" or upper == "PACK" then return "item" end
     if upper == "SAVE" then return "save" end
     if upper == "OPTION" or upper == "OPTIONS" then return "options" end
     local player = game and game.save and game.save.player

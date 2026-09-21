@@ -42,7 +42,24 @@ return function(mod, suite)
     return inventory and (inventory[id] or 0) > 0
   end
 
+  -- FLY is the one action an engine can withhold from mods.  Gold leaves it
+  -- out of mod.world:availableFieldActions() and exposes neither canFly nor
+  -- flyTo, so there is no supported way to raise its destination picker.  The
+  -- capability is probed rather than the game version, and the row stays
+  -- visible saying so instead of quietly taking a binding that could never
+  -- fire.
+  local function supported(actionId)
+    if actionId ~= "fly" then return true end
+    local world = mod.world
+    return world ~= nil and type(world.canFly) == "function"
+      and type(world.flyTo) == "function"
+  end
+
   local function useFly(game)
+    if not supported("fly") then
+      notify(game, "FLY can't be used\nfrom a hotkey here.")
+      return false
+    end
     if not ready(game) then return false end
     if not hasItem(game, "HM_FLY") then
       notify(game, "HM02 FLY is\nrequired.")
@@ -126,9 +143,13 @@ return function(mod, suite)
       rows[#rows + 1] = {
         id = "travel." .. current.id,
         label = current.label,
-        value = function() return shared.comboLabel(spec:get()) end,
+        value = function()
+          if not supported(current.id) then return "UNSUPPORTED" end
+          return shared.comboLabel(spec:get())
+        end,
         help = current.help,
         activate = function(game)
+          if not supported(current.id) then return end
           shared.captureCombo(game, current.label .. " HOTKEY", spec)
         end,
         unassign = function() shared.setBinding(spec, nil); return true end,

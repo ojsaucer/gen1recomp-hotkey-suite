@@ -50,15 +50,7 @@ return function(mod, suite)
     if commandMenu and type(commandMenu.battleState) == "function" then
       return commandMenu.battleState(game)
     end
-    local states = game and game.stack and game.stack.states
-    for i = #(states or {}), 1, -1 do
-      local state = states[i]
-      if type(state) == "table"
-          and (state.isBattle or state.isBattleState
-            or type(state.chooseMenu) == "function") then
-        return state
-      end
-    end
+    return shared.battle.find(game)
   end
 
   -- The level-up stat window is a local class inside the engine's
@@ -173,6 +165,16 @@ return function(mod, suite)
       and top.choicePushed ~= true
   end
 
+  -- Gold runs the whole learn-a-move flow as phases on the battle screen
+  -- instead of pushing boxes over it.  `learn-intro` is the preamble the
+  -- player would otherwise page through one press at a time; the three phases
+  -- that follow it are the forget decision itself, and are left alone for the
+  -- same reason Red's pushed choice box is.
+  local function learnIntroWaiting(battle)
+    if not battle or battle.phase ~= "learn-intro" then return false end
+    return shared.battle.textWaiting(battle)
+  end
+
   -- What, if anything, this module is allowed to advance right now.
   local function pending(game)
     local cfg = config()
@@ -181,10 +183,14 @@ return function(mod, suite)
     if not battle then return nil, cfg end
     local stack = game and game.stack
     local top = stack and type(stack.top) == "function" and stack:top() or nil
-    if cfg.levelUp and top ~= battle and isLevelUpStatBox(top) then
+    -- Red pushes the level-up stat window as its own state over the battle;
+    -- Gold holds it as a phase on the battle screen.  Both park on A/B.
+    if cfg.levelUp and ((top ~= battle and isLevelUpStatBox(top))
+        or shared.battle.statBoxPhase(battle)) then
       return "levelUp", cfg
     end
-    if cfg.learnPrompt and learnPromptWaiting(game) then
+    if cfg.learnPrompt
+        and (learnPromptWaiting(game) or learnIntroWaiting(battle)) then
       return "learnPrompt", cfg
     end
     if cfg.autoText then
@@ -274,6 +280,8 @@ return function(mod, suite)
       end
       battle.waitingSound, battle.waitSoundLeft = nil, nil
     end
+    -- Gold's equivalent hold, which carries the sfx name rather than a source.
+    if shared.battle.clearLevelUpFanfare(battle) then claimed = true end
     if claimed then
       learnedSfxArmed = 0
     elseif learnedSfxArmed > 0 then

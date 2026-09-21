@@ -227,14 +227,20 @@ T.eq(ex.shared.context({ stack = { states = {
 local overworldBase = { isOverworld = true }
 T.eq(ex.shared.canOpenMenu({ stack = { states = { overworldBase } } }), true,
   "canOpenMenu allows opening a menu from a clear overworld base")
-T.eq(ex.shared.canOpenMenu({ stack = { states = {
-  overworldBase, { screenId = "PartyMenu" },
-} } }), true,
-  "canOpenMenu still allows swapping to a new menu while one is already open")
-T.eq(ex.shared.canOpenMenu({ stack = { states = {
-  { isOverworld = true, engaging = true }, { screenId = "PartyMenu" },
-} } }), false,
-  "canOpenMenu still blocks while the base screen is mid-cutscene")
+-- canOpenMenu reads the base screen's own flags and never the id of whatever
+-- is open over it, so both generations' menu ids have to behave identically.
+-- Gold registers its builtins under Gen2-prefixed ids (Screens.GEN2_IDS), so
+-- the Gen 1 spelling below is a deliberate second case, not an oversight.
+for _, menuId in ipairs({ "PartyMenu", "Gen2PartyMenu" }) do
+  T.eq(ex.shared.canOpenMenu({ stack = { states = {
+    overworldBase, { screenId = menuId },
+  } } }), true,
+    "canOpenMenu still allows swapping to a new menu while one is already open")
+  T.eq(ex.shared.canOpenMenu({ stack = { states = {
+    { isOverworld = true, engaging = true }, { screenId = menuId },
+  } } }), false,
+    "canOpenMenu still blocks while the base screen is mid-cutscene")
+end
 T.eq(ex.shared.canOpenMenu({ stack = { states = {} } }), false,
   "canOpenMenu is nil-safe against an empty stack")
 

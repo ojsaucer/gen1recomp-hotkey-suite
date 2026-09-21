@@ -1,5 +1,49 @@
 # Changelog
 
+## [1.10.0] - 2026-09-20
+
+### Added
+
+- **Gen 2 support (Gold / Silver / Crystal).** The suite now loads and runs on
+  a Gen 2 boot alongside Gen 1, with the same modules, the same settings and
+  the same bindings. Gold is a second engine beside Red rather than a skin over
+  it, so the battle modules no longer read the battle's internals directly:
+  every phase, message and ball read now goes through one adapter that probes
+  for the capability it needs instead of asking which game is running.
+  - The move list is `moveSelect` on Red and `moves` on Gold; the command menu
+    is `menu` on both.
+  - Red parks on a battle message by raising a flag, Gold by holding a frame
+    count that only a button clears. AUTO TEXT reads both.
+  - The level-up stats window is a screen pushed over the battle on Red and a
+    phase on the battle itself on Gold. LEVEL UP advances both.
+  - Gold runs the whole learn-a-move flow as phases rather than pushed boxes.
+    LEARN TEXT pages its preamble and, as on Red, never touches the
+    forget-a-move decision itself.
+  - SKIP LV SFX releases Gold's sound hold for the level-up fanfare and the
+    exp bar. The caught-a-mon jingle shares that same field and is left alone.
+  - The ball menu throws through Gold's own item path, which spends the ball
+    itself, and reads the BALL pocket rather than a list of ball names. Gold's
+    Bug Contest is counted off its own PARK BALL counter instead of the pack.
+- **Start-menu bindings survive switching generations.** Gold labels the same
+  menus PACK, OPTION and STATUS where Red has ITEM, OPTION**S** and the
+  trainer card. Because settings are stored per installation rather than per
+  save, those three now bind to the same hotkey in both games.
+
+### Changed
+
+- The settings screens no longer borrow the engine's `OptionRows`. It is a
+  Gen 1 only module with no Gen 2 counterpart, so requiring it would have kept
+  the entire suite off Gold; the two entry points used are now part of the mod.
+  The screens are unchanged on Gen 1, to the pixel.
+
+### Known limitations on Gen 2
+
+- **The FLY travel hotkey is unavailable on Gold.** The engine does not expose
+  FLY to mods there yet — it is absent from the field-action list and there is
+  no supported way to raise its destination picker. The row stays visible and
+  reads `UNSUPPORTED` rather than accepting a binding that could never fire.
+  RETURN CENTER and BICYCLE are unaffected.
+
 ## [1.9.1] - 2026-09-20
 
 ### Fixed
