@@ -76,13 +76,34 @@
     widens the box — so its arrows now stay in a single column beside the
     move names.
 
+- **Every travel hotkey was dead on Gold**, FLY included — and RETURN CENTER
+  and BICYCLE with it. They each asked Red's question before firing: "is the
+  overworld the one and only state on the stack?" Gold runs the overworld as
+  a field and updates it only while that stack is *empty*, so the answer was
+  never yes. The frame test now fits either engine.
+- **FLY now works on Gold**, through the engine's own field-move pipeline.
+  Fly is missing from the field-action table Gold's `WorldAPI` walks, but the
+  pipeline that table feeds handles `FLY` like any other field move, so the
+  hotkey goes in there instead of reimplementing anything. Every one of the
+  engine's gates is kept: the STORM badge, the outdoors-only check that counts
+  a POKEMON CENTER as indoors, the engine's own refusal lines, the native fly
+  map and the bird. Who may fly is resolved through Gold's
+  `fieldmove.eligibility` hook chain, so another mod's answer is honoured.
+  The row is capability-probed rather than keyed to the game: an engine that
+  offers neither route still reads `GEN 1 ONLY` and accepts no binding.
+- **RETURN CENTER refused forever on Gold**, even standing in a POKEMON
+  CENTER. Red teleports out through one `World` method gated by the save's
+  `lastHeal`; Gold has neither name, so the hotkey fell into "visit a POKEMON
+  CENTER first" every time. Gold keeps the same trip in two halves — the heal
+  point, which reads the blackout override ahead of the spawn table so the
+  Fast Ship and Mr. POKEMON's house resolve the way the cart does, and the
+  warp itself. The hotkey now uses them, and Gold's heal point serves as its
+  `lastHeal`: nothing to return to is still a refusal.
+
 ### Known limitations on Gen 2
 
-- **The FLY travel hotkey is unavailable on Gold.** The engine does not expose
-  FLY to mods there yet — it is absent from the field-action list and there is
-  no supported way to raise its destination picker. The row stays visible and
-  reads `UNSUPPORTED` rather than accepting a binding that could never fire.
-  RETURN CENTER and BICYCLE are unaffected.
+- Gold's own menus remain the authority on anything the suite only opens: QUIT
+  is still not bindable, for the reason above.
 
 ## [1.9.1] - 2026-09-20
 

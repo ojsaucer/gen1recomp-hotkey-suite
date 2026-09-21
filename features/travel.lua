@@ -4,8 +4,8 @@ return function(mod, suite)
   local TextBox = require("src.render.TextBox")
   local ACTIONS = {
     { id = "fly", label = "FLY", short = "FLY",
-      help = "Opens the TOWN MAP to fly. Needs HM02 FLY and a free "
-        .. "overworld." },
+      help = "Opens the fly map to pick a town you have visited. Needs a "
+        .. "POKEMON that knows FLY, the badge for it, and open ground." },
     { id = "center", label = "RETURN CENTER", short = "PC",
       help = "Teleports to the last POKEMON CENTER you healed at, exactly as "
         .. "DIG or an ESCAPE ROPE would." },
@@ -31,10 +31,7 @@ return function(mod, suite)
   end
 
   local function ready(game)
-    local stack = game and game.stack
-    local states = stack and stack.states
-    return shared.canOpenMenu(game) and states and #states == 1
-      and stack:top() == states[1]
+    return shared.canOpenMenu(game) and shared.world.ownsFrame(game)
   end
 
   local function hasItem(game, id)
@@ -42,31 +39,59 @@ return function(mod, suite)
     return inventory and (inventory[id] or 0) > 0
   end
 
-  -- FLY is the one action an engine can withhold from mods.  Gold leaves it
-  -- out of mod.world:availableFieldActions() and exposes neither canFly nor
-  -- flyTo, so there is no supported way to raise its destination picker.  The
-  -- capability is probed rather than the game version, and the row stays
-  -- visible saying so instead of quietly taking a binding that could never
-  -- fire.
+  -- FLY is the one action an engine can withhold.  Red hands it to mods
+  -- directly; Gold reaches the same place through the field-move pipeline
+  -- (see shared.world.flyMode).  Probed, never assumed from the game id.
+  --
+  -- The answer is remembered because the row's label is drawn from the
+  -- options screen, where there may be no live overworld to probe -- and an
+  -- engine we have not managed to ask yet must not be branded GEN 1 ONLY.
+  -- Only a live world that answers to neither shape is a definite no.
+  local flyKnown
+  local function flyMode()
+    local api = mod.world
+    local ow = api and api.overworld and api:overworld() or nil
+    local mode = shared.world.flyMode(api, ow)
+    if mode then
+      flyKnown = mode
+    elseif ow then
+      flyKnown = false
+    end
+    if flyKnown == false then return nil end
+    return flyKnown or "fieldmove"
+  end
+
   local function supported(actionId)
     if actionId ~= "fly" then return true end
-    local world = mod.world
-    return world ~= nil and type(world.canFly) == "function"
-      and type(world.flyTo) == "function"
+    return flyMode() ~= nil
   end
 
   local function useFly(game)
-    if not supported("fly") then
+    if not ready(game) then return false end
+    local ow = mod.world:overworld()
+    if not ow then return false end
+    local mode = shared.world.flyMode(mod.world, ow)
+    if mode == "fieldmove" then
+      -- partyMoveUser runs the engine's own fieldmove.eligibility hook chain,
+      -- so another mod's idea of who may fly is honoured here too.
+      local mon = ow:partyMoveUser("FLY")
+      if not mon then
+        notify(game, "No POKEMON knows\nFLY.")
+        return false
+      end
+      -- A refusal -- no STORM BADGE, or standing indoors -- has already put
+      -- the engine's own line on the screen, so there is nothing to add.
+      local result = ow:useFieldMove("FLY", mon)
+      return (result and result.ok) and true or false
+    end
+    if mode ~= "picker" then
       notify(game, "FLY can't be used\nfrom a hotkey here.")
       return false
     end
-    if not ready(game) then return false end
     if not hasItem(game, "HM_FLY") then
       notify(game, "HM02 FLY is\nrequired.")
       return false
     end
-    local ow = mod.world:overworld()
-    if not ow then return false end
     Screens.push(game, "TownMap", {
       fly = true,
       onFly = function(mapId)
@@ -79,12 +104,26 @@ return function(mod, suite)
 
   local function returnToCenter(game)
     if not ready(game) then return false end
+    local ow = mod.world:overworld()
+    if not ow then return false end
+    local mode = shared.world.centerMode(ow)
+    if mode == "spawn" then
+      -- healPoint is Gold's lastHeal: nil until somewhere has been healed at.
+      if not ow:healPoint() then
+        notify(game, "Visit a POKEMON\nCENTER first.")
+        return false
+      end
+      ow:warpToSpawn()
+      return true
+    end
+    if mode ~= "teleportOut" then
+      notify(game, "RETURN CENTER can't\nbe used here.")
+      return false
+    end
     if not game.save.lastHeal then
       notify(game, "Visit a POKEMON\nCENTER first.")
       return false
     end
-    local ow = mod.world:overworld()
-    if not ow then return false end
     ow:beginTeleportOut()
     return true
   end
@@ -144,7 +183,7 @@ return function(mod, suite)
         id = "travel." .. current.id,
         label = current.label,
         value = function()
-          if not supported(current.id) then return "UNSUPPORTED" end
+          if not supported(current.id) then return "GEN 1 ONLY" end
           return shared.comboLabel(spec:get())
         end,
         help = current.help,
@@ -174,6 +213,8 @@ return function(mod, suite)
   shared.travel = {
     actions = ACTIONS,
     config = config,
+    ready = ready,
+    flyMode = flyMode,
     run = function(game, id)
       return run[id] and run[id](game) or false
     end,

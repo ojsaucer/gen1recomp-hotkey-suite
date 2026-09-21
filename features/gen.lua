@@ -319,6 +319,70 @@ return function(mod, suite)
       or base.transitioning or base.warping or hasMoves) and true or false
   end
 
+  -- Whether the overworld itself owns the frame, which is what a travel hotkey
+  -- needs before it may warp the player.  Red stacks the overworld as the one
+  -- and only state; Gold runs it as a field and updates it only while the
+  -- state stack is EMPTY (src/core/Game2.lua:2140).  Asking Red's question on
+  -- Gold -- "is there exactly one state?" -- is never true there, which is
+  -- what silently disabled every travel hotkey on Gold, FLY included.
+  function world.ownsFrame(game)
+    local base, kind = world.find(game)
+    if not base then return false end
+    local stack = game and game.stack
+    if type(stack) ~= "table" or type(stack.top) ~= "function" then
+      return false
+    end
+    if kind == "field" then return stack:top() == nil end
+    local states = stack.states
+    return type(states) == "table" and #states == 1
+      and stack:top() == states[1]
+  end
+
+  -- --------------------------------------------------------------------- FLY
+  --
+  -- Red puts FLY on the mod API itself: canFly reports eligibility and flyTo
+  -- takes a destination, leaving the picker for the caller to push
+  -- (docs/modding.md:377-380).  Gold exposes neither -- but that is an
+  -- omission rather than a refusal.  Fly is simply absent from the
+  -- FIELD_ACTIONS table Gold's own WorldAPI:useFieldAction walks, while the
+  -- pipeline that table feeds, World:useFieldMove, handles "FLY" like any
+  -- other field move.  Going in that way keeps every one of the engine's own
+  -- gates: the STORM badge, the outdoors-only check that counts a POKEMON
+  -- CENTER as indoors, the refusal lines, the native fly map and the bird
+  -- animation.  Nothing about fly is reimplemented here, so nothing here can
+  -- drift out of step with the cart.
+  function world.flyMode(api, ow)
+    if type(api) == "table" and type(api.canFly) == "function"
+        and type(api.flyTo) == "function" then
+      return "picker"
+    end
+    if type(ow) == "table" and type(ow.useFieldMove) == "function"
+        and type(ow.partyMoveUser) == "function" then
+      return "fieldmove"
+    end
+    return nil
+  end
+
+  -- ------------------------------------------------------- RETURN CENTER
+  --
+  -- Red hands the whole trip to World:beginTeleportOut, gated by the
+  -- save's lastHeal.  Gold has neither name.  It keeps the same two halves
+  -- apart instead: healPoint resolves where the player would wake up --
+  -- reading the blackout override ahead of the spawn table, so the Fast Ship
+  -- and Mr. POKEMON's house resolve the way the cart does -- and warpToSpawn
+  -- is the trip itself.  healPoint is therefore Gold's lastHeal: nil until
+  -- somewhere has been healed at, which is exactly the question the hotkey
+  -- needs to ask before it refuses.
+  function world.centerMode(ow)
+    if type(ow) ~= "table" then return nil end
+    if type(ow.beginTeleportOut) == "function" then return "teleportOut" end
+    if type(ow.healPoint) == "function"
+        and type(ow.warpToSpawn) == "function" then
+      return "spawn"
+    end
+    return nil
+  end
+
   shared.world = world
 
   -- ------------------------------------------------------------ the start menu
