@@ -89,14 +89,15 @@ return function(mod, suite)
   local function commandReady(battle)
     if not shared.battle.commandMenuOpen(battle) then return false end
     if battle.safari then return (battle.safari.balls or 0) > 0 end
-    local player = battle.player
-    if not player or not player.mon or player.mon.hp <= 0 then return false end
+    local fighter = shared.battle.fighter(battle)
+    local mon = fighter and fighter.mon
+    if not mon or (mon.hp or 0) <= 0 then return false end
     return true
   end
 
   local function moveReady(battle)
     return shared.battle.moveSelectOpen(battle)
-      and battle.player and type(battle.player.curMoves) == "table"
+      and type(shared.battle.moves(battle)) == "table"
       and not battle.moveSwapIndex
   end
 
@@ -113,7 +114,7 @@ return function(mod, suite)
     local battle = battleState(game)
     if not command or not commandReady(battle) then return false end
     battle.menuIndex = command.index
-    Sound.play(battle.data, "Press_AB")
+    Sound.play(shared.battle.data(battle), "Press_AB")
     if battle.safari then
       battle:chooseSafari(({ "ball", "bait", "rock", "run" })[command.index])
     else
@@ -125,12 +126,12 @@ return function(mod, suite)
   local function chooseMove(game, direction)
     local command = COMMANDS[direction]
     local battle = battleState(game)
-    local moves = battle and battle.player and battle.player.curMoves
+    local moves = battle and shared.battle.moves(battle)
     if not command or not moveReady(battle) or not moves[command.index] then
       return false
     end
     battle.moveIndex = command.index
-    Sound.play(battle.data, "Press_AB")
+    Sound.play(shared.battle.data(battle), "Press_AB")
     battle:chooseMove(command.index)
     return true
   end
@@ -139,7 +140,7 @@ return function(mod, suite)
     local battle = battleState(game)
     if not commandReady(battle) then return false end
     battle.menuIndex = 4
-    Sound.play(battle.data, "Press_AB")
+    Sound.play(shared.battle.data(battle), "Press_AB")
     if battle.safari then
       battle:chooseSafari("run")
     else
@@ -260,7 +261,7 @@ return function(mod, suite)
     if not typeId then return "---" end
     local name = typeId
     local ok, display = pcall(TypeChart.displayName, typeId,
-      battle and battle.data)
+      shared.battle.data(battle))
     if ok and type(display) == "string" and display ~= "" then
       name = display
     end
@@ -275,8 +276,8 @@ return function(mod, suite)
   -- `def.accuracy` is already a percentage: Damage.accuracyThreshold scales
   -- it by 255/100 to reach the roll's byte range.
   local function moveStats(battle, move)
-    local def = move and battle and battle.data and battle.data.moves
-      and battle.data.moves[move.id]
+    local data = shared.battle.data(battle)
+    local def = move and data and data.moves and data.moves[move.id]
     if not def then return nil end
     local power = tonumber(def.power) or 0
     local acc = tonumber(def.accuracy)
@@ -300,10 +301,11 @@ return function(mod, suite)
     if moveReady(battle) then
       local entries = {}
       local anyInfo = false
+      local moves = shared.battle.moves(battle) or {}
+      local data = shared.battle.data(battle)
       for index = 1, 4 do
-        local move = battle.player.curMoves[index]
-        local def = move and battle.data and battle.data.moves
-          and battle.data.moves[move.id]
+        local move = moves[index]
+        local def = move and data and data.moves and data.moves[move.id]
         local entry = {
           label = move and tostring(def and def.name or move.id) or "-",
         }

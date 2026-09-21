@@ -349,6 +349,9 @@ return function(mod, suite)
     if base and (base.isOverworld or base == game.overworld or base.map ~= nil) then
       return "overworld"
     end
+    -- Gold keeps the world off the stack entirely, so there is no states[1]
+    -- to recognise it by.
+    if shared.world and shared.world.find(game) then return "overworld" end
     return "other"
   end
 
@@ -728,9 +731,12 @@ return function(mod, suite)
   local function extractMenuItems(game, source)
     local out, seen = {}, {}
     for index, item in ipairs(source or {}) do
-      local activate = item.onSelect or item.activate or item.action or item.select
+      -- Gen 1 rows carry the function that opens them; Gold's are data that
+      -- dispatch by id.  The adapter answers both, so a row is kept whenever
+      -- the engine gives us any way at all to open it.
+      local activate = shared.menu.activator(game, item)
       if type(activate) == "function" then
-        local label = tostring(item.label or item.name or item.id or ("ITEM " .. index))
+        local label = shared.menu.label(game, item, index)
         local base, id, suffix = stableMenuId(game, item, index), nil, 2
         id = base
         while seen[id] do id, suffix = base .. "_" .. suffix, suffix + 1 end
@@ -766,24 +772,29 @@ return function(mod, suite)
   function shared.closeMenus(game)
     local stack = game and game.stack
     if not stack or not stack.states then return end
+    local _, kind = shared.world.find(game)
+    if kind == "field" then
+      -- Gold's world is not on the stack, so "back to the overworld" means
+      -- emptying the stack rather than unwinding to states[1].  The guard
+      -- keeps a pop that does not shrink from spinning forever.
+      local guard = #stack.states
+      while #stack.states > 0 and guard > 0 do
+        stack:pop()
+        guard = guard - 1
+      end
+      return
+    end
     while #stack.states > 1 and stack:top() ~= stack.states[1] do stack:pop() end
   end
-  -- Only the base overworld screen's own flags gate opening a menu here.
-  -- Requiring an empty stack on top of it would also block *switching*
-  -- between two already-open menus (closeMenus() is what pops the old one),
-  -- so this only confirms the base screen itself is safe to act on.
+  -- Only the overworld's own state gates opening a menu here.  Requiring an
+  -- empty stack on top of it would also block *switching* between two
+  -- already-open menus (closeMenus() is what pops the old one), so this only
+  -- confirms the world itself is safe to act on.
   function shared.canOpenMenu(game)
     if not game or shared.context(game) ~= "overworld" then return false end
-    local stack = game.stack
-    local states = stack and stack.states
-    local base = states and states[1]
+    local base, kind = shared.world.find(game)
     if not base then return false end
-    local runner = base.runner or base.scriptRunner
-    if runner and runner.isRunning and runner:isRunning() then return false end
-    local moves = base.scriptMoves
-    local hasMoves = type(moves) == "table" and #moves > 0
-    return not (base.engaging or base.emote or base.teleportOut
-      or base.transitioning or base.warping or hasMoves)
+    return not shared.world.busy(base, kind)
   end
   function shared.activateMenuItem(game, id)
     if not shared.canOpenMenu(game) then return false end

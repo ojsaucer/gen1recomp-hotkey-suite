@@ -39,6 +39,26 @@
   Gen 1, to the pixel — including BACK sitting below the list, the wrap order,
   and the exit sound.
 
+### Fixed on Gen 2
+
+- **The menu hotkeys and the radial menu did nothing on Gold**, and the battle
+  command menu never opened. All three had the same cause: the suite read
+  Red's object graph directly, and Gold keeps the same facts elsewhere.
+  - Gold runs the overworld as a field on the game with an empty state stack,
+    where Gen 1 runs it as the bottom state. Every overworld hotkey tests that
+    stack to decide whether it may fire, so all of them were silently disabled.
+    The suite now locates the world on either engine, and defers to Gold's own
+    `World:busy()` — which accounts for the script VM, map setup, text and
+    choice boxes, field-move tails, fishing and headbutt — rather than
+    re-deriving a narrower answer.
+  - Gold's start-menu rows are data, dispatched by id, and carry no function to
+    call; the suite kept only rows that carried one, so it kept none. It now
+    opens a row through the engine's own dispatch, and labels the STATUS row
+    with the player's name as Gold does.
+  - Gold's battle screen holds its fighter one level down, names the move list
+    `moves`, and keeps no data table of its own, so every readiness check
+    failed. Those three reads now go through the adapter.
+
 ### Known limitations on Gen 2
 
 - **The FLY travel hotkey is unavailable on Gold.** The engine does not expose

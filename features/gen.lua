@@ -163,5 +163,142 @@ return function(mod, suite)
     return true
   end
 
+  -- ---------------------------------------------------------- the battle roster
+  --
+  -- Red's battle screen *is* the battle: the fighter hangs off it directly and
+  -- its move list is curMoves.  Gold's screen holds a battle model one level
+  -- down (screen.battle.player), names the move list moves, and has no .data
+  -- at all -- the ROM tables are reached through screen.game.data.  Every
+  -- readiness check that reached for battle.player therefore returned false on
+  -- Gold, which is why the command menu never opened.
+  function battle.fighter(b)
+    if type(b) ~= "table" then return nil end
+    local direct = b.player
+    if type(direct) == "table" then return direct end
+    local model = b.battle
+    if type(model) == "table" and type(model.player) == "table" then
+      return model.player
+    end
+    return nil
+  end
+
+  function battle.moves(b)
+    local fighter = battle.fighter(b)
+    if not fighter then return nil end
+    if type(fighter.curMoves) == "table" then return fighter.curMoves end
+    if type(b.playerMoves) == "function" then
+      local ok, moves = pcall(b.playerMoves, b)
+      if ok and type(moves) == "table" then return moves end
+    end
+    if type(fighter.moves) == "table" then return fighter.moves end
+    return nil
+  end
+
+  -- Sound.play wants the ROM data table, which Red hands off the battle and
+  -- Gold off the game behind it.
+  function battle.data(b)
+    if type(b) ~= "table" then return nil end
+    if b.data ~= nil then return b.data end
+    return b.game and b.game.data
+  end
+
   shared.battle = battle
+
+  -- ----------------------------------------------------------------- the world
+  --
+  -- Gen 1 runs the overworld as the bottom stack state, so every context gate
+  -- in the suite reads stack.states[1].  Gold runs it as a field on the game
+  -- with an *empty* stack -- Game2:update steps the world only while
+  -- stack:top() is nil (src/core/Game2.lua:2140).  Asking "where is the world"
+  -- once, here, is what keeps those gates generation-blind; reading states[1]
+  -- directly is why every overworld hotkey was silently dead on Gold.
+  local world = {}
+
+  -- Returns the world and which shape it was found in, so callers can keep
+  -- Gen 1 on exactly the path it already had.
+  function world.find(game)
+    if type(game) ~= "table" then return nil end
+    local states = game.stack and game.stack.states
+    local base = states and states[1]
+    if type(base) == "table"
+        and (base.isOverworld or base == game.overworld or base.map ~= nil) then
+      return base, "state"
+    end
+    -- Gold's World is recognised by the method the engine gates player action
+    -- on.  Matching on a `map` field instead would also match the world object
+    -- Red's Game holds during teardown, and quietly turn a shutting-down Gen 1
+    -- boot into an "overworld" that hotkeys are allowed to fire in.
+    local field = game.world
+    if type(field) == "table" and type(field.busy) == "function" then
+      return field, "field"
+    end
+    return nil
+  end
+
+  -- Gold's World:busy() (src/world/gen2/World.lua:1518-1530) is the engine's
+  -- own "may the player act" answer: the script VM, the map-setup blocking
+  -- call, text and choice boxes, field-move tails, fishing and headbutt.  It
+  -- is both broader and more accurate than the flag list Red's base screen
+  -- exposes, so on Gold we defer to it rather than re-deriving it.  The Gen 1
+  -- arm is the original check, untouched, and is selected by shape rather
+  -- than by game id.
+  function world.busy(base, kind)
+    if type(base) ~= "table" then return true end
+    if kind == "field" then
+      if type(base.busy) ~= "function" then return false end
+      local ok, busy = pcall(base.busy, base)
+      return (not ok) or (busy and true or false)
+    end
+    local runner = base.runner or base.scriptRunner
+    if runner and runner.isRunning and runner:isRunning() then return true end
+    local moves = base.scriptMoves
+    local hasMoves = type(moves) == "table" and #moves > 0
+    return (base.engaging or base.emote or base.teleportOut
+      or base.transitioning or base.warping or hasMoves) and true or false
+  end
+
+  shared.world = world
+
+  -- ------------------------------------------------------------ the start menu
+  --
+  -- Gen 1's rows carry the function that opens them.  Gold's are pure data --
+  -- { id, label, need, desc } -- and it dispatches by id through
+  -- Game2:openStartMenuItem (src/core/Game2.lua:449), which is the same entry
+  -- point the compat layer synthesises a row's onChoose from.  Requiring a
+  -- callable therefore dropped every Gold row on the floor, which emptied the
+  -- menu hotkeys and the radial that is built from the same list.
+  local menu = {}
+
+  function menu.activator(game, item)
+    local direct = item.onSelect or item.activate or item.action or item.select
+    if type(direct) == "function" then return direct end
+    local id = item.id
+    if id == nil then return nil end
+    if type(game) ~= "table" or type(game.openStartMenuItem) ~= "function" then
+      return nil
+    end
+    -- Dispatch with the row's own id.  The suite folds pack onto item (and
+    -- option onto options) so one saved binding survives the same install
+    -- launching either generation, but the engine only knows its own name.
+    return function(g)
+      local target = type(g) == "table" and g.openStartMenuItem and g or game
+      target:openStartMenuItem(id)
+    end
+  end
+
+  -- Gold builds the player's name into the STATUS row when it lays the menu
+  -- out, so the row itself carries label = nil.  Falling through to the id
+  -- would label it "status" in the suite's own lists.
+  function menu.label(game, item, index)
+    local label = item.label or item.name
+    if label ~= nil and tostring(label) ~= "" then return tostring(label) end
+    if tostring(item.id or "") == "status" then
+      local player = game and game.save and game.save.player
+      local name = player and player.name
+      if name ~= nil and tostring(name) ~= "" then return tostring(name) end
+    end
+    return tostring(item.id or ("ITEM " .. index))
+  end
+
+  shared.menu = menu
 end

@@ -49,8 +49,9 @@ return function(mod, suite)
   local function commandReady(battle)
     if not shared.battle.commandMenuOpen(battle) then return false end
     if battle.safari then return (battle.safari.balls or 0) > 0 end
-    local player = battle.player
-    if not player or not player.mon or player.mon.hp <= 0 then return false end
+    local fighter = shared.battle.fighter(battle)
+    local mon = fighter and fighter.mon
+    if not mon or (mon.hp or 0) <= 0 then return false end
     return true
   end
 
@@ -81,8 +82,7 @@ return function(mod, suite)
       if contest.count > 0 then
         balls[#balls + 1] = {
           id = contest.id,
-          name = getBallName(battle.game and battle.game.data or battle.data,
-            contest.id),
+          name = getBallName(shared.battle.data(battle), contest.id),
           count = contest.count,
         }
       end
@@ -93,7 +93,7 @@ return function(mod, suite)
       if count > 0 then
         balls[#balls + 1] = {
           id = "SAFARI_BALL",
-          name = getBallName(battle.data, "SAFARI_BALL"),
+          name = getBallName(shared.battle.data(battle), "SAFARI_BALL"),
           count = count,
         }
       end
@@ -110,7 +110,7 @@ return function(mod, suite)
         if count > 0 then
           balls[#balls + 1] = {
             id = id,
-            name = getBallName(battle.data, id),
+            name = getBallName(shared.battle.data(battle), id),
             count = count,
           }
         end
@@ -121,7 +121,7 @@ return function(mod, suite)
         seen[id] = true
         balls[#balls + 1] = {
           id = id,
-          name = getBallName(battle.data, id),
+          name = getBallName(shared.battle.data(battle), id),
           count = count,
         }
       end
