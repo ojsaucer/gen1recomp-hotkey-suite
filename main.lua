@@ -1,4 +1,3 @@
-local OptionsMenu = require("src.ui.OptionsMenu")
 local Font = require("src.render.Font")
 local Marquee = require("src.ui.Marquee")
 local PaletteFX = require("src.render.PaletteFX")
@@ -18,8 +17,12 @@ local OptionRows = { VISIBLE = 4 }
 local CONTENT_RIGHT = 152
 local function fits(x) return math.floor((CONTENT_RIGHT - x) / 8) end
 
-function OptionRows.clampScroll(index, scroll, total)
-  if index <= scroll then
+-- keep the cursor's box inside the viewport; the fixed bottom row shows the
+-- tail of the list
+function OptionRows.clampScroll(index, scroll, total, bottomRow)
+  if bottomRow and index >= bottomRow then
+    return math.max(0, total - OptionRows.VISIBLE)
+  elseif index <= scroll then
     return index - 1
   elseif index > scroll + OptionRows.VISIBLE then
     return index - OptionRows.VISIBLE
@@ -27,7 +30,7 @@ function OptionRows.clampScroll(index, scroll, total)
   return scroll
 end
 
-function OptionRows.draw(game, rows, index, scroll)
+function OptionRows.draw(game, rows, index, scroll, bottomLabel, bottomRow)
   love.graphics.setColor(1, 1, 1, 1)
   love.graphics.rectangle("fill", 0, 0, 160, 144)
   for slot = 1, OptionRows.VISIBLE do
@@ -54,6 +57,13 @@ function OptionRows.draw(game, rows, index, scroll)
   end
   if scroll + OptionRows.VISIBLE < #rows then
     Font.drawCode(Theme.moreArrow, 144, 128)
+  end
+  if bottomLabel then
+    love.graphics.setColor(0, 0, 0, 1)
+    Font.draw(bottomLabel, 16, 136)
+    if bottomRow and index == bottomRow then
+      Font.drawCode(Theme.cursor, 8, 136)
+    end
   end
   love.graphics.setColor(1, 1, 1, 1)
 end
@@ -108,6 +118,72 @@ local function paginateHelp(text)
     pages[#pages + 1] = table.concat(lines, "\n", i, math.min(i + 1, #lines))
   end
   return table.concat(pages, "\f")
+end
+
+-- The suite's navigation lists (INPUTS / CONTEXTS / CATEGORIES).
+--
+-- These used to be built with the engine's OptionsMenu, passing the rows in
+-- as opts.rows.  That is a Gen 1 only contract: Gold's OptionsMenu always
+-- builds its own vanilla rows and the Gen 2 adapter forwards only `options`
+-- and `onDone`, so `opts.rows` was dropped and the screen came up showing the
+-- game's own OPTION list instead of ours -- and, because the ui.options.rows
+-- hook ran again over it, with another HOTKEY SUITE row inside it.
+--
+-- The behaviour below is Red's own sub-page arm (src/ui/OptionsMenu.lua):
+-- rows 1..#rows with BACK as a virtual row underneath, so a list can never
+-- orphan its own exit, the same wrap order, and the same exit sound.  Owning
+-- it makes every suite screen render identically on both generations.
+local ListScreen = {}
+ListScreen.__index = ListScreen
+ListScreen.isOpaque = true
+
+function ListScreen.new(game, rows)
+  return setmetatable({ game = game, rows = rows, view = rows,
+                        index = 1, scroll = 0, sub = true }, ListScreen)
+end
+
+function ListScreen:sgbPalettes(game)
+  return PaletteFX.wholeNamed(game.data, "MEWMON")
+end
+
+-- DisplayOptionMenu .exitMenu is the only place this menu plays SFX_PRESS_AB.
+-- game.data is nil under the stub games the test harnesses drive.
+function ListScreen:close()
+  if self.game.data then
+    require("src.core.Sound").play(self.game.data, "Press_AB")
+  end
+  self.game.stack:pop()
+end
+
+function ListScreen:update()
+  local input = self.game.input
+  local rows = self.rows
+  local cancelRow = #rows + 1
+  if input:wasPressed("up") then
+    self.index = self.index > 1 and self.index - 1 or cancelRow
+  elseif input:wasPressed("down") then
+    self.index = self.index < cancelRow and self.index + 1 or 1
+  elseif input:wasPressed("left") or input:wasPressed("right")
+      or input:wasPressed("a") then
+    local dir = input:wasPressed("left") and -1 or 1
+    local row = rows[self.index]
+    if row and row.activate then
+      if input:wasPressed("a") then row.activate(self.game) end
+    elseif row and row.step then
+      row.step(self.game, dir)
+    elseif input:wasPressed("a") then -- BACK
+      self:close()
+    end
+  elseif input:wasPressed("b") or input:wasPressed("start") then
+    self:close()
+  end
+  self.scroll = OptionRows.clampScroll(self.index, self.scroll or 0,
+                                       #rows, cancelRow)
+end
+
+function ListScreen:draw()
+  OptionRows.draw(self.game, self.rows, self.index, self.scroll or 0,
+                  Strings("BACK"), #self.rows + 1)
 end
 
 local SettingsScreen = {}
@@ -226,7 +302,7 @@ return function(mod)
             }))
         end,
       }
-      return OptionsMenu.new(game, { rows = rows })
+      return ListScreen.new(game, rows)
     end,
   })
 
@@ -241,7 +317,7 @@ return function(mod)
           activate = function(g) suite.openSettings(g, inputId, current) end,
         }
       end
-      return OptionsMenu.new(game, { rows = rows })
+      return ListScreen.new(game, rows)
     end,
   })
 
@@ -262,7 +338,7 @@ return function(mod)
           }
         end
       end
-      return OptionsMenu.new(game, { rows = rows })
+      return ListScreen.new(game, rows)
     end,
   })
 

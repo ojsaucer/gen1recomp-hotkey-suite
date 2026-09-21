@@ -31,10 +31,13 @@
 
 ### Changed
 
-- The settings screens no longer borrow the engine's `OptionRows`. It is a
-  Gen 1 only module with no Gen 2 counterpart, so requiring it would have kept
-  the entire suite off Gold; the two entry points used are now part of the mod.
-  The screens are unchanged on Gen 1, to the pixel.
+- The settings screens no longer borrow the engine's `OptionsMenu` or its
+  `OptionRows`. Both are Gen 1 shapes: `OptionRows` has no Gen 2 counterpart
+  at all, and `OptionsMenu` ignores caller-supplied rows on Gen 2, so the
+  suite's own lists came up showing the game's OPTION screen instead of
+  themselves. The suite now owns every screen it opens. They are unchanged on
+  Gen 1, to the pixel — including BACK sitting below the list, the wrap order,
+  and the exit sound.
 
 ### Known limitations on Gen 2
 
