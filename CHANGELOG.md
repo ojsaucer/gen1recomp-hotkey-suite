@@ -65,6 +65,16 @@
     fighter's HP on the fighter itself where Gen 1 nests it one level deeper;
     because the command and ball menus gate on HP and the move menu does not,
     the move menu worked on Gold while those two stayed dead.
+  - **The control arrows sat on the wrong letters on Gold.** The legend is
+    painted into the battle's native tile grid, and the suite was painting
+    Gen 1's cells. Both engines step the command rows by 16px, so the rows
+    were right and only the columns were wrong — the arrows landed a whole
+    column to the left, over FIGHT and PACK. Gold's command cursor now comes
+    from Gold's own box and column-spacing tiles, including the contest
+    layout and the wide layout's 18-tile gutter. Gold's move list also never
+    reflows into two columns the way Gen 1's does when wide — the gutter only
+    widens the box — so its arrows now stay in a single column beside the
+    move names.
 
 ### Known limitations on Gen 2
 

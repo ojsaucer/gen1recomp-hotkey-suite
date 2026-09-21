@@ -416,14 +416,9 @@ return function(mod, suite)
     onBattleHUD(battle, function()
       love.graphics.push("all")
       love.graphics.setColor(1, 1, 1, 1)
-      local wide = battle.wideLayout and battle:wideLayout()
+      local wide = shared.battle.wideLayout(battle)
       if commandReady(battle) then
-        local xs
-        if wide then
-          xs = battle.safari and { 8, 160 } or { 168, 232 }
-        else
-          xs = battle.safari and { 8, 104 } or { 72, 120 }
-        end
+        local xs = shared.battle.commandArrowXs(battle, wide)
         for index = 1, 4 do
           local col = (index - 1) % 2
           local row = math.floor((index - 1) / 2)
@@ -436,8 +431,8 @@ return function(mod, suite)
           drawArrow(xs[col + 1], 112 + row * 16, direction)
         end
       elseif moveReady(battle) then
-        if wide then
-          local xs = { 8, 112 }
+        local xs = shared.battle.moveArrowXs(battle, wide)
+        if xs then
           for index = 1, 4 do
             local col = (index - 1) % 2
             local row = math.floor((index - 1) / 2)

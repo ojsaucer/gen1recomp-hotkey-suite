@@ -214,6 +214,56 @@ return function(mod, suite)
     return b.game and b.game.data
   end
 
+  -- -------------------------------------------------------- the legend anchors
+  --
+  -- The control legend is painted into the battle's own native tile grid, so
+  -- it has to land on the engine's own cursor cells.  Both engines put the
+  -- command cursor in a two-column, two-row grid one tile left of each label,
+  -- and both step the rows by 16px -- which is why only the COLUMNS were ever
+  -- wrong on Gold, and why the arrows sat on the right lines but the wrong
+  -- letters.  Gold's cells are src/ui/gen2/BattleState.lua:199-206
+  -- (MENU_BOX_X 8 / MENU_COL_SPACING 6, and 2 / 12 for a contest) with the
+  -- cursor at boxX + 1 (:4516-4518), shifted right by the wide layout's
+  -- src/ui/gen2/WideBattle.lua:11 EXTRA_TILES gutter.
+  local GOLD_WIDE_TILES = 18
+
+  -- Shape probe, not a game id -- the same one battle.fighter turns on.
+  local function goldBattle(b)
+    return type(b) == "table" and type(b.player) ~= "table"
+      and type(b.battle) == "table" and type(b.battle.player) == "table"
+  end
+
+  function battle.wideLayout(b)
+    if type(b) ~= "table" or type(b.wideLayout) ~= "function" then
+      return false
+    end
+    local ok, wide = pcall(b.wideLayout, b)
+    return (ok and wide) and true or false
+  end
+
+  function battle.commandArrowXs(b, wide)
+    if goldBattle(b) then
+      local box, step = 8, 6
+      if b.contest then box, step = 2, 12 end
+      local first = box + 1 + (wide and GOLD_WIDE_TILES or 0)
+      return { first * 8, (first + step) * 8 }
+    end
+    if wide then
+      return b.safari and { 8, 160 } or { 168, 232 }
+    end
+    return b.safari and { 8, 104 } or { 72, 120 }
+  end
+
+  -- Red reflows its move list into two columns for the wide layout.  Gold does
+  -- not: the wide gutter only widens the list box (BattleState.lua:4504) while
+  -- the names keep hlcoord 6 and the cursor hlcoord 5 on rows 13..16
+  -- (:4534-4539) -- exactly where Red puts them when it is narrow.  nil means
+  -- "a single column", which the caller draws down the gutter at x 40.
+  function battle.moveArrowXs(b, wide)
+    if not wide or goldBattle(b) then return nil end
+    return { 8, 112 }
+  end
+
   shared.battle = battle
 
   -- ----------------------------------------------------------------- the world
