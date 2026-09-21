@@ -48,6 +48,43 @@ jobs:
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "asset=hotkey_suite-$VERSION.zip" >> "$GITHUB_OUTPUT"
 
+      - name: Cut the release notes from the changelog
+        shell: bash
+        env:
+          VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          # Cut these before anything is tagged or published: a missing
+          # section should fail the build, not leave a tag with no release.
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          version = os.environ["VERSION"]
+          text = Path("CHANGELOG.md").read_text(encoding="utf-8")
+
+          # The heading the notes are cut from: "## [1.10.0] - 2026-09-20".
+          # Everything up to the next "## " belongs to this version.
+          pattern = re.compile(
+              r"^## \[" + re.escape(version) + r"\][^\n]*\n(.*?)(?=^## |\Z)",
+              re.DOTALL | re.MULTILINE,
+          )
+          match = pattern.search(text)
+          if not match:
+              raise SystemExit(
+                  f"CHANGELOG.md has no '## [{version}]' section. Add one "
+                  "before releasing: it is what the release notes and the "
+                  "launcher's changelog are both cut from."
+              )
+
+          body = match.group(1).strip()
+          if not body:
+              raise SystemExit(f"the '## [{version}]' section is empty")
+
+          Path("release-notes.md").write_text(body + "\n", encoding="utf-8")
+          print(f"{len(body.splitlines())} lines of notes for {version}")
+          PY
+
       - name: Install Lua 5.1
         run: |
           sudo apt-get update -qq
@@ -84,7 +121,8 @@ jobs:
 
           asset = os.environ["ASSET"]
           source = Path(".")
-          skip = {".git", ".github", "tests", ".release-version"}
+          skip = {".git", ".github", "tests", ".release-version",
+                  "release-notes.md"}
 
           paths = []
           for path in sorted(source.rglob("*")):
@@ -109,6 +147,8 @@ jobs:
                   raise SystemExit(f"archive is missing {sorted(missing)}")
               if any(name.startswith("tests/") for name in names):
                   raise SystemExit("archive must not ship tests/")
+              if "release-notes.md" in names:
+                  raise SystemExit("archive must not ship release-notes.md")
               if any("/" in name and name.split("/")[0] == "hotkey_suite"
                      for name in names):
                   raise SystemExit("archive must be flat, not nested in a folder")
@@ -159,4 +199,4 @@ jobs:
         run: |
           gh release create "$TAG" "$ASSET" \
             --title "Hotkey Suite ${TAG#v}" \
-            --notes "See CHANGELOG.md for details."
+            --notes-file release-notes.md
