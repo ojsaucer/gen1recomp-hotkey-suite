@@ -1,9 +1,9 @@
 # Hotkey Suite for Gen1Recomp
 
-A modular accessibility and input suite for **Keyboard** and **Gamepad** in Pokémon Red, Blue, Yellow, Gold, Silver, and Crystal.
+A modular accessibility and input suite for **Keyboard** and **Gamepad** in Pokémon Red, Blue, Yellow, Gold, Silver, Crystal, FireRed, and LeafGreen.
 
 Configure everything from one place:  
-`OPTIONS > HOTKEY SUITE`
+`OPTIONS > HOTKEY SUITE` — or, on FireRed and LeafGreen, `START > HOTKEY SUITE`
 
 > ### ⚠️ Everything starts OFF
 > **Every module ships disabled and every hotkey ships unbound.** Installing the
@@ -67,7 +67,30 @@ Each module below has its own **ENABLED** master switch (**OFF** by default).
 
 ## Compatibility
 
-- Runs on both generations. Every module works on Gold, Silver, and Crystal as it does on Red, Blue, and Yellow, and your settings and bindings are shared between them. The one exception is the **FLY** travel hotkey: the engine does not expose FLY to mods on Gen 2 yet, so that row reads `UNSUPPORTED` there instead of taking a binding that could never fire. RETURN CENTER and BICYCLE work in both.
+Settings and bindings are stored per installation rather than per save, so a
+hotkey assigned in one game is already live in all of them.
+
+| | Gen 1 (Red / Blue / Yellow) | Gen 2 (Gold / Silver / Crystal) | Gen 3 (FireRed / LeafGreen) |
+|---|---|---|---|
+| Autofire | ✅ | ✅ | ✅ |
+| Menu hotkeys | ✅ | ✅ | ✅ |
+| Travel — Bicycle / Return Center | ✅ | ✅ | ✅ |
+| Travel — Fly | ✅ | ✅ | `UNSUPPORTED` |
+| Battle command menu / Battle text / Ball menu | ✅ | ✅ | — |
+| Radial wheel | ✅ | ✅ | — |
+| In-game settings screen | ✅ `OPTIONS` | ✅ `OPTIONS` | ✅ `START` |
+
+- **FLY** is the one action an engine can withhold. Red hands it to mods
+  directly and Gold reaches the same place through its field-move pipeline, but
+  FireRed's fly destinations are the region map's town spawn points and nothing
+  exposes them, so the row reads `UNSUPPORTED` there and accepts no binding that
+  could never fire. RETURN CENTER and BICYCLE work in all three.
+- **Configuring on Gen 3.** FireRed's option list is closed to mods, so the
+  suite takes the Start Menu instead and sits just above **EXIT**. The screen
+  behind that entry is drawn with FireRed's own chrome — its window frames, its
+  font, its dimmed-row selection — but it is the same menu: same tree, same
+  buttons, same help on **START**. Bindings are stored per installation, so a
+  hotkey assigned on Red is already live on FireRed and vice versa.
 - Works alongside custom battle UI mods (Floating Battle HUD, Voxel Ascendant, Kanto Ascendant): the Battle Command Menu detects modded battle layouts and draws a floating legend with real move names instead of fighting for the vanilla cursor.
 
 ---
@@ -76,7 +99,7 @@ Each module below has its own **ENABLED** master switch (**OFF** by default).
 
 1. Download the latest `hotkey_suite-<version>.zip` from [Releases](https://github.com/ojsaucer/gen1recomp-hotkey-suite/releases).
 2. Create a `hotkey_suite` folder inside your `mods/` directory and extract the archive into it. The archive is flat, so `manifest.json` and `main.lua` must end up directly inside `mods/hotkey_suite/`.
-3. Enable **Hotkey Suite** in the launcher, then open **OPTIONS > HOTKEY SUITE**.
+3. Enable **Hotkey Suite** in the launcher, then open **OPTIONS > HOTKEY SUITE** (**START > HOTKEY SUITE** on FireRed and LeafGreen).
 4. Pick an input type, open a module, switch **ENABLED** to **ON**, and assign your hotkeys.
 
 ### Updating

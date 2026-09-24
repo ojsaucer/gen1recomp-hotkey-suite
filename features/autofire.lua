@@ -134,6 +134,9 @@ return function(mod, suite)
     local cfg = config()
     if not state.active or cfg.mode ~= "toggle" or cfg.notice == "off"
         or not viewport then return end
+    -- The notice is drawn with the Gen 1 font on a 160x144 frame.  Autofire
+    -- itself still runs on FireRed -- only its badge is withheld.
+    if not shared.chromeAvailable(game) then return end
     local text, width, height = "AUTOFIRE", Font.width("AUTOFIRE") + 8, 16
     local x = cfg.notice:find("right", 1, true) and (160 - width - 2)
       or (cfg.notice:find("center", 1, true) and math.floor((160 - width) / 2) or 2)

@@ -1,5 +1,102 @@
 # Changelog
 
+## [1.12.0] - 2026-10-04
+
+### Added
+
+- **A settings screen on Gen 3, drawn with FireRed's own chrome.** Hotkeys no
+  longer have to be assigned from a Gen 1 or Gen 2 boot: `START > HOTKEY
+  SUITE` opens the same INPUT / CONTEXT / MODULE / SETTINGS tree the other two
+  generations show, and the combo capture prompt comes with it.
+  - The tree is not a second copy. `main.lua` publishes the input list, the
+    context list and the module lookup once, and both presentations read from
+    those, so a module registered tomorrow appears on all three generations
+    without either screen being touched.
+  - Every button means on Gen 3 exactly what it means on Gen 1 — A opens or
+    sets, left/right adjust, SELECT clears a binding, START shows a module's
+    help, B backs out one level — including the small asymmetries: the
+    navigation lists end in a BACK row and close on START, the settings lists
+    do not and spend START on help instead.
+  - Help text is regrouped into two-line pages that each hold for A, the same
+    treatment Gen 1 gives it, measured against FireRed's dialogue box.
+  - The list geometry, the frame, the dimming that marks the current row and
+    the bobbing scroll arrows are FireRed's, taken from its own OPTION menu,
+    and the window frame follows whichever one the player chose. Parity is a
+    promise about behaviour, not about pixels.
+- **`START > HOTKEY SUITE` as the Gen 3 entry point.** Gen 3's option list
+  raises no mod hook, so there is no OPTIONS row to add. Its Start Menu does,
+  and an entry there may carry its own `onSelect`, so the suite takes that
+  route and sits just above EXIT.
+
+### Changed
+
+- **Combo capture is one state machine with two faces.** Arming the capture is
+  now separate from drawing it, so the Gen 1 screen and the Gen 3 layer share
+  the identical rules about which keys count, when a combination is complete
+  and what a bare A or B may not be bound to.
+- **The suite knows when its own screen is up on Gen 3.** The check that stops
+  the suite reacting to a keypress while the player is editing the keypress
+  used to scan `game.stack`, which Gen 3 does not have. It now asks the active
+  presentation, so synthesized input cannot type through the help text or
+  steal a combination mid-capture on any generation.
+
+### Not yet on Gen 3
+
+The radial wheel and the autofire HUD badge are still Gen 1 chrome and remain
+withheld on FireRed, as do the battle modules. An inactive module reports
+itself as OFF, so nothing here is a difference the player can be surprised by.
+
+## [1.11.0] - 2026-09-27
+
+### Added
+
+- **Gen 3 support (FireRed / LeafGreen).** The suite now loads and runs on a
+  Gen 3 boot alongside Gen 1 and Gen 2. Bindings are stored per installation
+  rather than per save, so every hotkey already assigned on Red or Gold is
+  live on FireRed the moment it boots — there is nothing to set up twice.
+  - **Autofire** works in full: every mode, speed, target and the NEXT INPUT
+    method.
+  - **Menu hotkeys** open the START menu screens. FireRed's rows are pure data
+    with no callback to rewire, and Game3 has no `openStartMenuItem` to hand
+    an id to, so dispatch goes through the engine's own `StartMenu.confirm()`
+    — the same path the player's A press takes, so the flag gates that built
+    the list, the menu sound and the SAVE and RETIRE prompts all still run.
+    BAG, TRAINER CARD and OPTION bind to the same hotkeys as Red's ITEM,
+    trainer card and OPTIONS.
+  - **Travel hotkeys:** BICYCLE and RETURN CENTER. FireRed splits the trip to
+    the POKEMON CENTER the way Gold does but names the second half
+    `warpToHealPoint`, and both halves are reachable, so the hotkey needs
+    nothing the engine does not already do for a blackout.
+
+### Changed
+
+- **The generation adapter now answers for three engines rather than two.**
+  FireRed is further from Red than Gold is: it has no state stack, keeps
+  nothing world-shaped on the game object at all, and reaches mods through a
+  compatibility layer. Every one of those differences is stated once, in
+  `features/gen.lua`, and every helper still probes for the capability it
+  needs rather than asking which game is running.
+  - "Where is the world" gains a third answer. Red stacks it, Gold hangs it
+    off the game, and FireRed exposes it only through the mod API, whose
+    `:overworld()` is already nil unless the game is in the field.
+  - "May the player act" defers to FireRed's own gate, the one its field
+    actions apply a moment later, rather than re-deriving it here.
+- **The FLY row reads `UNSUPPORTED` rather than `GEN 1 ONLY`.** Gold has taken
+  a binding since 1.10.0, so the old label was already wrong there, and on
+  FireRed it would have been actively misleading. The row still refuses a
+  binding only when a live world has answered to neither route.
+
+### Not yet on Gen 3
+
+The suite's own screens — the settings list, the capture prompt, the radial
+wheel and the autofire badge — are Gen 1 chrome: one font atlas, one 160x144
+frame, one state stack. FireRed shares none of the three. Those are withheld
+there rather than drawn broken, and a native FireRed settings screen is the
+next piece of work. Until it lands, Gen 3 hotkeys are configured from a Gen 1
+or Gen 2 boot of the same installation. The battle modules are likewise
+inactive on Gen 3 for now. Nothing about this is a behaviour difference the
+player can be surprised by: an inactive module reports itself as OFF.
+
 ## [1.10.0] - 2026-09-20
 
 ### Added

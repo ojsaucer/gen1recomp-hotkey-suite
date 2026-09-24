@@ -265,6 +265,13 @@ return function(mod)
     return out
   end
 
+  -- The navigation tree is described once here and read by every
+  -- presentation, so the Gen 3 screens cannot drift out of step with the
+  -- Gen 1 ones as modules are added.
+  suite.inputs = INPUTS
+  suite.contexts = CONTEXTS
+  suite.featuresFor = featuresFor
+
   function suite.openSettings(game, inputId, feature)
     Screens.push(game, "HotkeySuiteSettings", inputId, feature)
   end
@@ -361,6 +368,7 @@ return function(mod)
   suite.load("features/command_menu.lua")
   suite.load("features/ball_menu.lua")
   suite.load("features/battle_text.lua")
+  suite.load("features/gen3_ui.lua")
 
   -- Every spec compiled its combination while the store was being read for
   -- the first time; recompile once now that all of them are registered.
@@ -380,12 +388,17 @@ return function(mod)
     })
   end)
 
-  -- No Start Menu entry is added. Kanto Ascendant's collector only files an
-  -- item under one of four hardcoded groups (quests / research / partners /
-  -- events), and its ASCENDANT > SETTINGS screen builds its children from a
-  -- private registry with no third-party injection point, so there is no way
-  -- to reach a placement that makes contextual sense. OPTIONS > HOTKEY SUITE
-  -- is the canonical entry point and is reachable on every install.
+  -- No Start Menu entry is added on Gen 1 or Gen 2. Kanto Ascendant's
+  -- collector only files an item under one of four hardcoded groups (quests /
+  -- research / partners / events), and its ASCENDANT > SETTINGS screen builds
+  -- its children from a private registry with no third-party injection point,
+  -- so there is no way to reach a placement that makes contextual sense.
+  -- OPTIONS > HOTKEY SUITE is the canonical entry point and is reachable on
+  -- every install.
+  --
+  -- Gen 3 is the exception, and not by preference: the wrap above never runs
+  -- there because `option_rows.lua` raises no hook at all, so there is no
+  -- OPTIONS row to add. features/gen3_ui.lua takes the Start Menu instead.
 
   mod.exports.registerFeature = suite.register
   mod.exports.features = suite.features

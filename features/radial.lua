@@ -133,6 +133,9 @@ return function(mod, suite)
     if active or not config().enabled or not shared.canOpenMenu(game) then
       return false
     end
+    -- The radial is a pushed Gen 1 screen.  FireRed has no state stack to
+    -- push it onto, so the menu hotkeys carry that generation instead.
+    if not shared.chromeAvailable(game) then return false end
     local items = shared.refreshStartMenuItems(game)
     if #items == 0 then return false end
     local cfg = config()

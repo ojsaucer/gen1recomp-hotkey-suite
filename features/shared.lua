@@ -349,8 +349,17 @@ return function(mod, suite)
     if base and (base.isOverworld or base == game.overworld or base.map ~= nil) then
       return "overworld"
     end
+    -- FireRed keeps no battle object on the game and stays in phase "field"
+    -- while one runs, so neither check above sees it.  The engine's own
+    -- answer is Game3:speedCategory(), which asks battle.isActive()
+    -- (src/core/Game3.lua:571-577).
+    if type(game.speedCategory) == "function" then
+      local ok, category = pcall(game.speedCategory, game)
+      if ok and category == "battle" then return "battle" end
+    end
     -- Gold keeps the world off the stack entirely, so there is no states[1]
-    -- to recognise it by.
+    -- to recognise it by.  FireRed keeps nothing world-shaped on the game at
+    -- all and is reached through the mod API.
     if shared.world and shared.world.find(game) then return "overworld" end
     return "other"
   end
@@ -368,7 +377,14 @@ return function(mod, suite)
   -- help boxes OVER a settings screen: checking only the top would let
   -- synthesized input (autofire) through the moment help opened, which blew
   -- straight past the help text before it could be read.
+  -- An alternate presentation (Gen 3) registers itself here.  Gen 3 has no
+  -- `game.stack` for the Gen 1 chrome to push onto, so that build supplies
+  -- its own screen layer and the logic below routes to it instead.
+  local altUi = nil
+  function shared.registerUi(ui) altUi = ui end
+
   local function suiteScreenOpen(game)
+    if altUi and altUi.isOpen and altUi.isOpen() then return true end
     local stack = game and game.stack
     local states = stack and stack.states
     for index = #(states or {}), 1, -1 do
@@ -401,11 +417,46 @@ return function(mod, suite)
     }
   end
 
+  -- ----------------------------------------------------------- suite chrome
+  --
+  -- Every pixel the suite draws for itself -- the settings screens, the
+  -- capture prompt, the radial and the autofire notice -- is Gen 1 chrome:
+  -- the src.render.Font atlas on a 160x144 frame, pushed onto game.stack.
+  -- Gold shares all three, so both generations get the same screens for free.
+  -- FireRed shares none of them.  It runs 240x160, draws with
+  -- src/ui/game3/frlg_font.lua, and its Game object has no state stack at all
+  -- (src/core/Game3.lua:115), so a push is an index of nil and a Font.draw is
+  -- a frame of nothing.  Behaviour is at parity across all three generations;
+  -- the chrome deliberately is not, and this is the one gate that says so.
+  -- Bindings are stored per installation rather than per generation, so a
+  -- hotkey assigned on Red or Gold is already live on FireRed.
+  function shared.chromeAvailable(game)
+    if game == nil then return tonumber(mod.generation) ~= 3 end
+    return type(game.stack) == "table" and type(game.stack.push) == "function"
+  end
+
+  -- Arming the capture is independent of drawing it, so both presentations
+  -- share one state machine and only differ in what they put on screen.
+  local function beginCapture(spec)
+    local ignore = processingInput and processingInput.input == spec.input
+      and processingInput.pressed and processingInput.name or nil
+    capture = {
+      input = spec.input, spec = spec, pending = {}, down = {},
+      ignoreUntilRelease = ignore,
+    }
+  end
+
+  --- The live capture state, or nil.  Read-only; for alternate presentations
+  --- that need to draw the pending combo themselves.
+  function shared.captureState() return capture end
+
+  shared.MAX_COMBO_PIECES = 4
+
   local CaptureScreen = {}
   CaptureScreen.__index = CaptureScreen
   CaptureScreen.isOpaque = true
   CaptureScreen.isHotkeySuiteScreen = true
-  CaptureScreen.MAX_PIECES = 4
+  CaptureScreen.MAX_PIECES = shared.MAX_COMBO_PIECES
 
   function CaptureScreen:sgbPalettes(game)
     return require("src.render.PaletteFX").wholeNamed(game.data, "MEWMON")
@@ -430,18 +481,33 @@ return function(mod, suite)
 
   mod.content.screens:register("HotkeySuiteCapture", {
     new = function(game, title, spec)
-      local ignore = processingInput and processingInput.input == spec.input
-        and processingInput.pressed and processingInput.name or nil
-      capture = {
-        input = spec.input, spec = spec, pending = {}, down = {},
-        ignoreUntilRelease = ignore,
-      }
+      beginCapture(spec)
       return setmetatable({ game = game, title = title }, CaptureScreen)
     end,
   })
 
   function shared.captureCombo(game, title, spec)
-    Screens.push(game, "HotkeySuiteCapture", title, spec)
+    if shared.chromeAvailable(game) then
+      Screens.push(game, "HotkeySuiteCapture", title, spec)
+      return
+    end
+    -- Gen 3: the suite's own layer draws the prompt.  `beginCapture` first so
+    -- the layer can render the pending combo on the very frame it opens.
+    if altUi and altUi.openCapture then
+      beginCapture(spec)
+      altUi.openCapture(game, title, spec)
+    end
+  end
+
+  -- Tear down whichever presentation is showing the capture prompt.
+  local function closeCapture(game)
+    if altUi and altUi.captureOpen and altUi.captureOpen() then
+      if altUi.closeCapture then altUi.closeCapture() end
+      return
+    end
+    if game and type(game.stack) == "table" and game.stack.pop then
+      game.stack:pop()
+    end
   end
 
   local function captureInput(inputId, name, pressed, game)
@@ -455,7 +521,7 @@ return function(mod, suite)
     end
     if inputId == "keyboard" and name == "escape" and pressed then
       capture = nil
-      game.stack:pop()
+      closeCapture(game)
       return true
     end
     if pressed and not capture.down[name]
@@ -470,7 +536,7 @@ return function(mod, suite)
         local spec, pieces = capture.spec, capture.pending
         if bindingAllowed(inputId, canonical(inputId, pieces)) then
           capture = nil
-          game.stack:pop()
+          closeCapture(game)
           shared.setBinding(spec, pieces)
         else
           capture.pending = {}
@@ -707,6 +773,8 @@ return function(mod, suite)
   -- installation rather than per save.
   local MENU_ID_ALIASES = {
     pack = "item", option = "options", status = "trainer_card",
+    -- FireRed's own names for the same three rows.
+    bag = "item", trainer = "trainer_card",
   }
 
   local function stableMenuId(game, item, index)
@@ -751,10 +819,19 @@ return function(mod, suite)
   end
 
   function shared.onMenuItems(listener) menuListeners[#menuListeners + 1] = listener end
+  -- The cache is keyed by game because Gen 1 raises the hook with the very
+  -- object the input hooks hand out.  FireRed raises it with whatever
+  -- Gen3Compat's live() resolved at the moment the menu opened, which is the
+  -- same Game3 in practice but is not guaranteed to be, and a miss there
+  -- would silently empty the menu hotkeys.  The last list is therefore kept
+  -- alongside as a fallback; only one start menu can be open at a time in any
+  -- of the three engines, so there is nothing for it to be confused with.
+  local lastMenuItems
   mod.hooks:wrap("ui.start_menu.items", function(next, game, items)
     local out = next(game, items)
     if type(out) == "table" then
       menuCache[game] = extractMenuItems(game, out)
+      lastMenuItems = menuCache[game]
       for _, listener in ipairs(menuListeners) do listener(game, menuCache[game]) end
     end
     return out
@@ -762,7 +839,7 @@ return function(mod, suite)
 
   function shared.refreshStartMenuItems(game)
     require("src.ui.StartMenu").new(game)
-    return menuCache[game] or {}
+    return menuCache[game] or lastMenuItems or {}
   end
   function shared.startMenuItems(game)
     return menuCache[game] or shared.refreshStartMenuItems(game)
@@ -774,6 +851,11 @@ return function(mod, suite)
   end
   function shared.closeMenus(game)
     local stack = game and game.stack
+    -- FireRed has no state stack at all: its menus are pushed onto
+    -- src/ui/game3/stack.lua by the screens themselves, and the engine's own
+    -- dispatcher layers the new one over the start menu rather than unwinding
+    -- first.  Leaving it alone is what makes a menu hotkey there land exactly
+    -- where pressing START and A would.
     if not stack or not stack.states then return end
     local _, kind = shared.world.find(game)
     if kind == "field" then
@@ -793,6 +875,12 @@ return function(mod, suite)
   -- empty stack on top of it would also block *switching* between two
   -- already-open menus (closeMenus() is what pops the old one), so this only
   -- confirms the world itself is safe to act on.
+  --
+  -- FireRed cannot draw that distinction: the single answer it exposes,
+  -- Hud.busy(), already counts an open menu as busy (src/ui/game3/hud.lua:49).
+  -- A menu hotkey there opens from the field as it does everywhere else, but
+  -- pressing a second one while a menu is up does nothing rather than
+  -- switching.  That is the engine's own gate, not a rule invented here.
   function shared.canOpenMenu(game)
     if not game or shared.context(game) ~= "overworld" then return false end
     local base, kind = shared.world.find(game)

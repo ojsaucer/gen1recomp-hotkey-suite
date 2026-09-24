@@ -1,15 +1,20 @@
--- Generation adapter for the battle modules.
+-- Generation adapter.
 --
 -- Gold is a second engine beside Red rather than a skin over it: a Gen 2 boot
 -- runs src/ui/gen2/BattleState.lua, which keeps its own phase vocabulary and
--- its own message plumbing.  Every read and write the battle modules make goes
--- through this file so the difference is stated once.
+-- its own message plumbing.  FireRed is a third, further out still: it has no
+-- state stack, no world on the game object, its own 240x160 chrome, and it
+-- reaches mods through src/mods/Gen3Compat.lua.  Every read and write the
+-- feature modules make goes through this file so each difference is stated
+-- once.
 --
 -- Each helper probes for the capability it needs instead of asking which game
 -- is running.  A version allow-list would drop the suite out of Gold by
 -- construction -- the adapters would resolve, the patches would land, and the
 -- features would still never appear -- which is the failure the engine's own
--- porting guide calls the most confusing possible outcome.
+-- porting guide calls the most confusing possible outcome.  The one place a
+-- generation is named is shared.chromeAvailable, and that is about which font
+-- and frame size to draw, not about what the suite is allowed to do.
 return function(mod, suite)
   local shared = suite.shared
   local battle = {}
@@ -294,6 +299,21 @@ return function(mod, suite)
     if type(field) == "table" and type(field.busy) == "function" then
       return field, "field"
     end
+    -- FireRed puts nothing world-shaped on the game at all: Game3.new sets
+    -- only self.input (src/core/Game3.lua:115), and the hooks hand mods the
+    -- raw Game3 rather than the Gen3Compat facade, so there is neither a
+    -- stack to read states[1] from nor a .world to ask busy() of.  The field
+    -- is reached only through the mod API, whose :overworld() already answers
+    -- nil unless Game3.phase is "field" (src/world/game3/WorldAPI.lua:57) --
+    -- the same question the two arms above ask of their own engines.  The API
+    -- object is returned as the handle because on FireRed the API *is* the
+    -- world handle; the controller behind it is fetched per call.
+    local api = mod.world
+    if type(api) == "table" and type(api.overworld) == "function"
+        and type(api.availableFieldActions) == "function"
+        and api:overworld() then
+      return api, "api"
+    end
     return nil
   end
 
@@ -306,6 +326,20 @@ return function(mod, suite)
   -- than by game id.
   function world.busy(base, kind)
     if type(base) ~= "table" then return true end
+    if kind == "api" then
+      -- FireRed's own "may the player act" answer is Gen3Compat.worldBusy:
+      -- the field lock, the script VM, an active battle, a mid-warp fade and
+      -- a player mid-step.  It is not a mod-facing name, but every public
+      -- entry point that respects it reports it the same way -- a second
+      -- return of why -- so availableFieldActions is asked instead of
+      -- reaching into src/mods.  It is the same gate useFieldAction applies
+      -- a moment later (src/world/game3/WorldAPI.lua:214,242), so a hotkey
+      -- that passes here is one the engine would have accepted anyway.
+      if type(base.availableFieldActions) ~= "function" then return false end
+      local ok, _, why = pcall(base.availableFieldActions, base)
+      if not ok then return true end
+      return why ~= nil
+    end
     if kind == "field" then
       if type(base.busy) ~= "function" then return false end
       local ok, busy = pcall(base.busy, base)
@@ -328,6 +362,13 @@ return function(mod, suite)
   function world.ownsFrame(game)
     local base, kind = world.find(game)
     if not base then return false end
+    -- FireRed's modal layers live on src/ui/game3/stack.lua, which the game
+    -- object does not expose -- but it does not need to be read separately:
+    -- Hud.busy() folds "a menu is open" in with the rest (hud.lua:45-52), and
+    -- that is what worldBusy reports through uiBusy.  So on FireRed "the
+    -- overworld owns the frame" and "the world is not busy" are the same
+    -- answer, already computed above.
+    if kind == "api" then return not world.busy(base, kind) end
     local stack = game and game.stack
     if type(stack) ~= "table" or type(stack.top) ~= "function" then
       return false
@@ -352,8 +393,16 @@ return function(mod, suite)
   -- animation.  Nothing about fly is reimplemented here, so nothing here can
   -- drift out of step with the cart.
   function world.flyMode(api, ow)
+    -- FireRed carries both API names and refuses anyway: canFly answers
+    -- honestly but flyTo warns and returns nil, "unsupported", because its
+    -- destinations are the region map's town spawn points, which have no
+    -- seam (src/world/game3/WorldAPI.lua:290-296).  The picker arm is really
+    -- two capabilities -- the API opens the map, the overworld performs the
+    -- warp -- so both halves are probed.  FireRed's overworld facade lists
+    -- flyTo as absent, which is what separates it from Red here.
     if type(api) == "table" and type(api.canFly) == "function"
-        and type(api.flyTo) == "function" then
+        and type(api.flyTo) == "function"
+        and type(ow) == "table" and type(ow.flyTo) == "function" then
       return "picker"
     end
     if type(ow) == "table" and type(ow.useFieldMove) == "function"
@@ -380,6 +429,15 @@ return function(mod, suite)
         and type(ow.warpToSpawn) == "function" then
       return "spawn"
     end
+    -- FireRed splits the trip the same way Gold does but names the second
+    -- half after the first: healPoint resolves where the player would wake
+    -- up and warpToHealPoint is the trip.  Both are backed on the Gen 3
+    -- overworld facade, so RETURN CENTER needs nothing FireRed does not
+    -- already do for a blackout.
+    if type(ow.healPoint) == "function"
+        and type(ow.warpToHealPoint) == "function" then
+      return "healPoint"
+    end
     return nil
   end
 
@@ -401,7 +459,7 @@ return function(mod, suite)
   -- handles them itself by raising a confirmation first (StartMenu.lua:256-268).
   -- Dispatching them directly would skip that prompt, and for QUIT that means
   -- throwing away everything since the last save on a single keypress.
-  local MENU_NOT_DISPATCHABLE = { quit = true, quitContest = true }
+  local MENU_NOT_DISPATCHABLE = { quit = true, quitContest = true, exit = true }
 
   function menu.dispatchId(item)
     if type(item) ~= "table" then return nil end
@@ -418,16 +476,44 @@ return function(mod, suite)
     if type(direct) == "function" then return direct end
     local id = menu.dispatchId(item)
     if id == nil then return nil end
-    if type(game) ~= "table" or type(game.openStartMenuItem) ~= "function" then
-      return nil
+    if type(game) == "table" and type(game.openStartMenuItem) == "function" then
+      -- Dispatch with the row's own id.  The suite folds pack onto item (and
+      -- option onto options) so one saved binding survives the same install
+      -- launching either generation, but the engine only knows its own name.
+      return function(g)
+        local target = type(g) == "table" and g.openStartMenuItem and g or game
+        target:openStartMenuItem(id)
+      end
     end
-    -- Dispatch with the row's own id.  The suite folds pack onto item (and
-    -- option onto options) so one saved binding survives the same install
-    -- launching either generation, but the engine only knows its own name.
-    return function(g)
-      local target = type(g) == "table" and g.openStartMenuItem and g or game
-      target:openStartMenuItem(id)
+    -- FireRed's rows are pure data like Gold's, but there is no
+    -- openStartMenuItem to hand the id to: Game3 has no such method, and a
+    -- FireRed row carries no onSelect to rewire either.  What it does have is
+    -- StartMenu.confirm(), the engine's own dispatcher, and it reads nothing
+    -- but StartMenu.cursor (src/ui/game3/start_menu.lua:212-215).  Pointing
+    -- the cursor at the row and confirming is the same path the player's own
+    -- A press takes, so the flag gates that built the list, the menu sound,
+    -- and the follow-up prompts SAVE and RETIRE raise all still run.  The row
+    -- is looked up by id at fire time rather than captured by index, because
+    -- show() rebuilds ENTRIES on every open and a gated row may have appeared
+    -- or gone since the list was cached.
+    local ok, StartMenu = pcall(require, "src.ui.StartMenu")
+    if ok and type(StartMenu) == "table"
+        and type(StartMenu.confirm) == "function"
+        and type(StartMenu.ENTRIES) == "table" then
+      return function()
+        local entries = StartMenu.ENTRIES
+        if type(entries) ~= "table" then return end
+        for index = 1, #entries do
+          local entry = entries[index]
+          if type(entry) == "table" and tostring(entry.id) == id then
+            StartMenu.cursor = index
+            StartMenu.confirm()
+            return
+          end
+        end
+      end
     end
+    return nil
   end
 
   -- Gold has already substituted the player's name into the STATUS row and

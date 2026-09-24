@@ -27,25 +27,45 @@ return function(mod, suite)
   local function save(cfg) shared.store.set("travel", cfg) end
 
   local function notify(game, text)
-    game.stack:push(TextBox.new(game, text))
+    if shared.chromeAvailable(game) then
+      game.stack:push(TextBox.new(game, text))
+      return
+    end
+    -- FireRed has no state stack to push a TextBox onto; its field dialogue
+    -- is the singleton src/ui/game3/message, which is what the engine's own
+    -- field actions write their refusals to.  Its box is one line wider than
+    -- Red's, so the hard break that keeps Red inside 18 columns is dropped.
+    local ok, Message = pcall(require, "src.ui.game3.message")
+    if ok and type(Message) == "table" and type(Message.show) == "function" then
+      Message.show((text:gsub("\n", " ")), function() Message.close() end)
+    end
   end
 
   local function ready(game)
     return shared.canOpenMenu(game) and shared.world.ownsFrame(game)
   end
 
+  -- Tri-state on purpose.  Red and Gold both keep the bag on game.save, but
+  -- FireRed keeps it on the session and hands mods the raw Game3, so there is
+  -- no inventory to read -- and "I could not find your bag" must never be
+  -- reported to the player as "you do not have one".  nil means unknown, and
+  -- every caller lets the engine's own check refuse instead: useFieldAction
+  -- already gates the BICYCLE on Bag.has (src/world/game3/WorldAPI.lua:219).
   local function hasItem(game, id)
     local inventory = game and game.save and game.save.inventory
-    return inventory and (inventory[id] or 0) > 0
+    if type(inventory) ~= "table" then return nil end
+    return (inventory[id] or 0) > 0
   end
 
   -- FLY is the one action an engine can withhold.  Red hands it to mods
-  -- directly; Gold reaches the same place through the field-move pipeline
-  -- (see shared.world.flyMode).  Probed, never assumed from the game id.
+  -- directly; Gold reaches the same place through the field-move pipeline;
+  -- FireRed offers neither, because its destinations are the region map's
+  -- town spawn points and nothing exposes them (see shared.world.flyMode).
+  -- Probed, never assumed from the game id.
   --
   -- The answer is remembered because the row's label is drawn from the
   -- options screen, where there may be no live overworld to probe -- and an
-  -- engine we have not managed to ask yet must not be branded GEN 1 ONLY.
+  -- engine we have not managed to ask yet must not be branded UNSUPPORTED.
   -- Only a live world that answers to neither shape is a definite no.
   local flyKnown
   local function flyMode()
@@ -88,7 +108,7 @@ return function(mod, suite)
       notify(game, "FLY can't be used\nfrom a hotkey here.")
       return false
     end
-    if not hasItem(game, "HM_FLY") then
+    if hasItem(game, "HM_FLY") == false then
       notify(game, "HM02 FLY is\nrequired.")
       return false
     end
@@ -107,13 +127,14 @@ return function(mod, suite)
     local ow = mod.world:overworld()
     if not ow then return false end
     local mode = shared.world.centerMode(ow)
-    if mode == "spawn" then
-      -- healPoint is Gold's lastHeal: nil until somewhere has been healed at.
+    if mode == "spawn" or mode == "healPoint" then
+      -- healPoint is Gold's and FireRed's lastHeal: nil until somewhere has
+      -- been healed at.
       if not ow:healPoint() then
         notify(game, "Visit a POKEMON\nCENTER first.")
         return false
       end
-      ow:warpToSpawn()
+      if mode == "healPoint" then ow:warpToHealPoint() else ow:warpToSpawn() end
       return true
     end
     if mode ~= "teleportOut" then
@@ -130,7 +151,7 @@ return function(mod, suite)
 
   local function useBike(game)
     if not ready(game) then return false end
-    if not hasItem(game, "BICYCLE") then
+    if hasItem(game, "BICYCLE") == false then
       notify(game, "A BICYCLE is\nrequired.")
       return false
     end
@@ -183,7 +204,7 @@ return function(mod, suite)
         id = "travel." .. current.id,
         label = current.label,
         value = function()
-          if not supported(current.id) then return "GEN 1 ONLY" end
+          if not supported(current.id) then return "UNSUPPORTED" end
           return shared.comboLabel(spec:get())
         end,
         help = current.help,
