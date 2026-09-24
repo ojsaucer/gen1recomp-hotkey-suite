@@ -41,7 +41,13 @@ return function(mod, suite)
       get = function() return bindingFor(inputId, actionId) end,
       set = function(value) saveBinding(inputId, actionId, value) end,
       onFire = function(game)
-        shared.refreshStartMenuItems(game)
+        -- Deliberately *not* refreshed first.  activateMenuItem refreshes
+        -- itself, after its gate, and the order matters on Gen 3: refreshing
+        -- means StartMenu.new(), which on FireRed opens the start menu rather
+        -- than just building it, and an open menu is one Hud.busy() reports
+        -- as a busy world -- so a pre-refresh made canOpenMenu answer false
+        -- about a situation it had itself created, and every menu hotkey
+        -- stopped at the start menu it had just opened.
         shared.activateMenuItem(game, actionId)
       end,
     })

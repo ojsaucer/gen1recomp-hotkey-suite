@@ -591,7 +591,11 @@ return function(mod, suite)
     end
     return insertBeforeId(out, "exit", {
       id = "hotkeySuite",
-      label = Strings("HOTKEY SUITE"),
+      -- FireRed sizes the start menu's window to its widest stock label
+      -- (POKEDEX / POKEMON), and "HOTKEY SUITE" runs past it. The screen
+      -- behind the row still calls itself HOTKEY SUITE; only the row that
+      -- has to fit inside that box is shortened.
+      label = Strings("HOTKEYS"),
       -- StartMenu.confirm honours onSelect before any of its built-in cases,
       -- so this is all that is needed to own the entry.
       onSelect = function(g, session) UI.show(g, session) end,

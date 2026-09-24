@@ -837,6 +837,12 @@ return function(mod, suite)
     return out
   end, 1000000)
 
+  -- Refreshing the list is not free on every engine.  Gen 1 and Gold build a
+  -- menu object here and leave it unshown, but FireRed has no such object:
+  -- Gen3Compat backs `new` with Hud.openStartMenu, so asking what is on the
+  -- start menu *opens* the start menu.  Callers that also gate on the world
+  -- being idle must therefore gate first and refresh second, because an open
+  -- menu is a busy world as far as Hud.busy() is concerned.
   function shared.refreshStartMenuItems(game)
     require("src.ui.StartMenu").new(game)
     return menuCache[game] or lastMenuItems or {}

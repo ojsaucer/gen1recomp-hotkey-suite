@@ -40,6 +40,22 @@
   presentation, so synthesized input cannot type through the help text or
   steal a combination mid-capture on any generation.
 
+### Fixed
+
+- **Menu hotkeys on Gen 3 opened the Start Menu and stopped there.** Asking
+  what is on the start menu means calling `StartMenu.new`, and on FireRed
+  that does not build a menu the way it does on Red and Gold — Gen3Compat
+  backs it with `Hud.openStartMenu`, so the question *opens* the menu. The
+  hotkey asked first and dispatched second, and in between it had made the
+  world busy by its own doing: an open menu is a busy world as far as
+  `Hud.busy()` is concerned, so the dispatch then declined to act. The
+  refresh was redundant in the first place — the dispatcher already refreshes
+  itself, after its gate — so it is gone, and the reason it must not come
+  back is written where someone would reach for it.
+- **The Start Menu row read `HOTKEY SUITE` and ran past the menu's frame.**
+  FireRed sizes that window to its widest stock label, so the row is now
+  `HOTKEYS`. The screen behind it still calls itself HOTKEY SUITE.
+
 ### Not yet on Gen 3
 
 The radial wheel and the autofire HUD badge are still Gen 1 chrome and remain
