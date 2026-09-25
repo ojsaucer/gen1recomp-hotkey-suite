@@ -1,5 +1,40 @@
 # Changelog
 
+## [1.16.0] - 2026-10-08
+
+### Fixed
+
+- **Menu, radial, and travel hotkeys (FLY / RETURN TO CENTER / BICYCLE) no
+  longer drop a press thrown while the player is mid-step.** Vanilla never
+  actually loses a START/A press thrown mid-step: `PlayerMovement` answering
+  `PLAYERMOVEMENT_CONTINUE` just defers the whole poll to that step's landing
+  frame, where it is acted on as though nothing had happened. Every engine's
+  own "is a menu safe to open right now" gate (Gen 1's internal
+  `acceptsMenuInput`, Gen 2's `World:acceptsMenuInput`, Gen 3's
+  `Gen3Compat.worldBusy`) folds that same instant into a plain "the world is
+  busy" answer for anyone asking from outside a single frame's own input
+  poll — which is exactly what a hotkey dispatched from a raw key/gamepad
+  event is. Gen 1 and Gen 2 already tolerated this (their own busy checks
+  never looked at movement), so the drop was really only visible on Gen 3,
+  where it made every menu/radial/travel hotkey feel unreliable while
+  walking or biking. A hotkey press that finds the world busy is now kept
+  alive and retried every frame for up to a third of a second — long enough
+  to always land the moment a step finishes, short enough that a press
+  thrown right before a real cutscene or battle just expires quietly rather
+  than queuing for a lifetime — instead of being silently swallowed.
+
+### Added
+
+- **The radial menu now works on Gen 3 (FireRed).** It was Gen 1/2-only
+  until now, entirely inert on FireRed, because it was built against Gold's
+  chrome state-stack screens, a shape FireRed's engine does not have at all.
+  It now gets its own presentation there: the same aim-a-direction-and-let-go
+  wheel, drawn on FireRed's own modal layer stack with the map-popup chrome
+  and font the autofire badge and settings screen already use, so a wheel
+  bound to a hotkey now opens and closes identically in feel across all
+  three generations, even though the art underneath it differs the way each
+  generation's own UI already does.
+
 ## [1.15.0] - 2026-10-07
 
 ### Changed

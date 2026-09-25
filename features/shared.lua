@@ -749,6 +749,66 @@ return function(mod, suite)
     end
   end)
 
+  -- --------------------------------------------------------- deferred retry
+  --
+  -- CheckMenuOW (engine/overworld/events.asm:802) never drops a START press
+  -- thrown mid-step: PlayerMovement answering PLAYERMOVEMENT_CONTINUE just
+  -- defers the whole poll to the step's landing frame (events.asm:474-477),
+  -- where it is acted on as though nothing had happened. Every engine's own
+  -- "is a menu safe to open" gate folds that same instant into a plain "the
+  -- world is busy" for a caller reaching in from outside a single frame's
+  -- Joypad poll -- WorldAPI's local acceptsMenuInput (Gen 1), World:
+  -- acceptsMenuInput (src/world/gen2/World.lua), Gen3Compat.worldBusy (Gen 3)
+  -- -- so a hotkey fired the instant the player started a step used to be
+  -- silently swallowed instead of landing where the cart's own input would
+  -- have. shared.deferUntilIdle keeps a rejected attempt alive across
+  -- input.step instead of discarding it, retrying every frame for a healthy
+  -- multiple of the longest walk step (16 frames on foot, 8 on a bike)
+  -- before giving up -- long enough that the request still lands the moment
+  -- the world stops being busy the way it would from inside the ROM's own
+  -- loop, but not so long that a press thrown into a script or a battle
+  -- queues for a small eternity. There is no cheaper way to tell "still
+  -- walking" from "started a cutscene" apart without re-deriving every
+  -- engine's own busy reasons, and a handful of wasted retries is a low
+  -- price for never losing a press the player could see land.
+  local DEFER_FRAMES = 20
+  local deferred = {}
+
+  function shared.deferUntilIdle(game, tryFn, tag)
+    -- pcall'd the same as every retry below: a tryFn that throws on its very
+    -- first, synchronous attempt (game/world edge case, bad item id, ...)
+    -- must not be able to crash the input dispatch pipeline any more than
+    -- one that throws on attempt 2 onward can.
+    local ok, done = pcall(tryFn, game)
+    if ok and done then return true end
+    deferred[#deferred + 1] = { tryFn = tryFn, tag = tag, framesLeft = DEFER_FRAMES }
+    return false
+  end
+
+  -- The radial's release needs this: aiming stops meaning "select" the
+  -- instant the hotkey lets go, whether or not the wheel ever actually
+  -- opened, so a still-queued open must not spring open behind the player's
+  -- back a frame after they have already let go of it.
+  function shared.cancelDeferred(tag)
+    for i = #deferred, 1, -1 do
+      if deferred[i].tag == tag then table.remove(deferred, i) end
+    end
+  end
+
+  mod.hooks:wrap("input.step", function(next, game, dt)
+    next(game, dt)
+    if #deferred == 0 then return end
+    local remaining = {}
+    for _, entry in ipairs(deferred) do
+      local ok, done = pcall(entry.tryFn, game)
+      if not (ok and done) then
+        entry.framesLeft = entry.framesLeft - 1
+        if entry.framesLeft > 0 then remaining[#remaining + 1] = entry end
+      end
+    end
+    deferred = remaining
+  end)
+
   function shared.neutralizeStick(game, joystick, stick)
     if not gamepadNext then return false end
     gamepadNext(game, {

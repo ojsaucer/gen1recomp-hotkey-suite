@@ -77,7 +77,7 @@ hotkey assigned in one game is already live in all of them.
 | Travel — Bicycle / Return Center | ✅ | ✅ | ✅ |
 | Travel — Fly | ✅ | ✅ | `UNSUPPORTED` |
 | Battle command menu / Battle text / Ball menu | ✅ | ✅ | — |
-| Radial wheel | ✅ | ✅ | — |
+| Radial wheel | ✅ | ✅ | ✅ |
 | In-game settings screen | ✅ `OPTIONS` | ✅ `OPTIONS` | ✅ `START` |
 
 - **FLY** is the one action an engine can withhold. Red hands it to mods

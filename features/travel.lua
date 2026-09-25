@@ -182,7 +182,14 @@ return function(mod, suite)
           cfg.bindings[currentInput][currentAction.id] = value or false
           save(cfg)
         end,
-        onFire = function(game) return run[currentAction.id](game) end,
+        onFire = function(game)
+          -- ready(game) folds in the same "player is mid-step" busy answer
+          -- every generation gives a caller from outside a single frame's own
+          -- input poll (see shared.lua's "deferred retry" section), so a
+          -- press thrown while walking is retried each frame instead of
+          -- dropped, landing the moment the step does.
+          shared.deferUntilIdle(game, run[currentAction.id])
+        end,
       })
     end
   end

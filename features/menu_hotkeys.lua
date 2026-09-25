@@ -114,8 +114,17 @@ return function(mod, suite)
         -- as a busy world -- so a pre-refresh made canOpenMenu answer false
         -- about a situation it had itself created, and every menu hotkey
         -- stopped at the start menu it had just opened.
-        local opened = shared.activateMenuItem(game, actionId)
-        if opened and isGen3 and isQuickExit() then armQuickExit() end
+        --
+        -- deferUntilIdle is what actually opens it: canOpenMenu answers no
+        -- while the player is mid-step on every generation (see shared.lua's
+        -- "deferred retry" section), so a press thrown while walking is
+        -- retried each frame rather than dropped, landing the moment the
+        -- step does -- same as pressing START for real would.
+        shared.deferUntilIdle(game, function(g)
+          local opened = shared.activateMenuItem(g, actionId)
+          if opened and isGen3 and isQuickExit() then armQuickExit() end
+          return opened
+        end)
       end,
     })
     specs[inputId][actionId] = spec

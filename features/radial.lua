@@ -3,6 +3,40 @@ return function(mod, suite)
   local Font = require("src.render.Font")
   local Screens = require("src.ui.Screens")
   local active
+
+  local function optional(name)
+    local ok, module = pcall(require, name)
+    if ok and type(module) == "table" then return module end
+    return nil
+  end
+  -- Red and Gold push the radial as a Gen 1 chrome screen (below); FireRed has
+  -- no `game.stack` to push it onto, so it gets its own layer on FireRed's
+  -- own modal stack instead, drawn with the same Chrome.mapPopupFrame +
+  -- FrlgFont pairing the restyled autofire badge uses.
+  local Stack = optional("src.ui.game3.stack")
+  local Chrome = optional("src.ui.game3.chrome")
+  local FrlgFont = optional("src.ui.game3.frlg_font")
+
+  -- Shared between both presentations: which slice of the wheel a stick
+  -- deflection lands on, and where the wheel's own center sits for a given
+  -- corner/edge/center position on a `w`x`h` frame. Gen 1/2 call this at
+  -- 160x144; Gen 3 calls it at FireRed's own 240x160.
+  local function computeSelection(itemCount, x, y)
+    if math.sqrt(x * x + y * y) < 0.35 then return nil end
+    local atan2 = math.atan2 or math.atan
+    local angle = atan2(y, x)
+    return (math.floor((angle + math.pi / itemCount) / (2 * math.pi / itemCount))
+      % itemCount) + 1
+  end
+  local function centerFor(position, w, h)
+    local x = position:find("left", 1, true) and w * 0.35
+      or position:find("right", 1, true) and w * 0.65 or w * 0.5
+    local y = position:find("top", 1, true) and h * 0.3611
+      or position:find("bottom", 1, true) and h * 0.6389 or h * 0.5
+    return math.floor(x + 0.5), math.floor(y + 0.5)
+  end
+  local RADIUS = 44
+
   local POSITIONS = {
     "top_left", "top_center", "top_right",
     "center_left", "center", "center_right",
@@ -44,14 +78,7 @@ return function(mod, suite)
       or ((axis == "rightx" or axis == "righty") and "right")
     if stick ~= self.stick then return end
     if axis:sub(-1) == "x" then self.x = value else self.y = value end
-    if math.sqrt(self.x * self.x + self.y * self.y) < 0.35 then
-      self.selected = nil
-      return
-    end
-    local atan2 = math.atan2 or math.atan
-    local angle = atan2(self.y, self.x)
-    self.selected = (math.floor((angle + math.pi / #self.items)
-      / (2 * math.pi / #self.items)) % #self.items) + 1
+    self.selected = computeSelection(#self.items, self.x, self.y)
   end
   function Screen:close(activate)
     local item = activate and self.selected and self.items[self.selected]
@@ -78,25 +105,18 @@ return function(mod, suite)
     Font.drawCode(border.v, x, y + 8)
     Font.drawCode(border.v, x + w - 8, y + 8)
   end
-  local function centerFor(position)
-    local x = position:find("left", 1, true) and 56
-      or position:find("right", 1, true) and 104 or 80
-    local y = position:find("top", 1, true) and 52
-      or position:find("bottom", 1, true) and 92 or 72
-    return x, y
-  end
   function Screen:draw()
     local g = love.graphics
     local cfg = config()
-    local centerX, centerY = centerFor(cfg.position)
+    local centerX, centerY = centerFor(cfg.position, 160, 144)
     local minX, maxX = -centerX, 160 - centerX
     local minY, maxY = -centerY, 144 - centerY
     g.push()
     g.translate(centerX, centerY)
     local function drawItem(i, item, selected)
       local angle = (i - 1) * 2 * math.pi / #self.items
-      local anchorX = math.cos(angle) * 44
-      local anchorY = math.sin(angle) * 44
+      local anchorX = math.cos(angle) * RADIUS
+      local anchorY = math.sin(angle) * RADIUS
       local label = selected and item.label or item.label:sub(1, 3)
       local textWidth = Font.width(label)
       local x = math.floor(anchorX - textWidth / 2)
@@ -129,17 +149,117 @@ return function(mod, suite)
     g.setColor(1, 1, 1, 1)
   end
 
+  -- ------------------------------------------------------------- Gen 3 wheel
+  --
+  -- FireRed's modal UI lives on src/ui/game3/stack.lua, a layer stack whose
+  -- draw/update/handleInput the engine calls directly off `layer.mod` with no
+  -- receiver (UiPass.drawUi's `tryDraw` calls `mod.draw()`, not `mod:draw()`).
+  -- A singleton table with plain functions -- the same shape gen3_ui.lua's
+  -- own `UI` uses -- fits that calling convention; `Gen3Radial:setAxis` and
+  -- `Gen3Radial:close` stay colon methods below purely because only this
+  -- file ever calls them, the same way `active:close(...)` already does for
+  -- Gen 1's Screen.
+  local Gen3Radial = { fade = 0 }
+
+  function Gen3Radial:setAxis(axis, value)
+    local stick = (axis == "leftx" or axis == "lefty") and "left"
+      or ((axis == "rightx" or axis == "righty") and "right")
+    if stick ~= self.stick then return end
+    if axis:sub(-1) == "x" then self.x = value else self.y = value end
+    self.selected = computeSelection(#self.items, self.x, self.y)
+  end
+
+  function Gen3Radial:close(activate)
+    local item = activate and self.selected and self.items[self.selected]
+    neutralize(self)
+    if Stack then Stack.pop("hotkey_suite_radial") end
+    if active == self then active = nil end
+    if item then shared.activateMenuItem(self.game, item.id) end
+  end
+
+  -- Consumes input outright while the wheel is up, the same as a Gen 1
+  -- opaque screen would: the wheel is driven entirely by the stick and the
+  -- hotkey's own release (onBreak, below), so there is nothing here for a
+  -- button press to do, and letting one fall through to Hud's own dispatch
+  -- would let START open the real Start Menu on top of the wheel.
+  function Gen3Radial.handleInput(_input) end
+
+  function Gen3Radial.update(dt)
+    Gen3Radial.fade = math.min(1, (Gen3Radial.fade or 0) + (dt or 0) * 12)
+    -- A layer only leaves the stack through Gen3Radial:close, except a hard
+    -- reset (returning to the title screen calls Stack.clear()) -- catch that
+    -- case too, so a stale `active` cannot block every later hotkey press.
+    if active == Gen3Radial and Stack and not Stack.has("hotkey_suite_radial") then
+      active = nil
+    end
+  end
+
+  function Gen3Radial.draw()
+    local items = Gen3Radial.items
+    if not (items and #items > 0 and Chrome and FrlgFont) then return end
+    local g = love.graphics
+    local cfg = config()
+    local centerX, centerY = centerFor(cfg.position, 240, 160)
+    local minX, maxX = -centerX, 240 - centerX
+    local minY, maxY = -centerY, 160 - centerY
+    g.push()
+    g.translate(centerX, centerY)
+    local function drawItem(i, item, selected)
+      local angle = (i - 1) * 2 * math.pi / #items
+      local anchorX = math.cos(angle) * RADIUS
+      local anchorY = math.sin(angle) * RADIUS
+      local label = selected and item.label or item.label:sub(1, 3)
+      local textWidth = FrlgFont.measure(label)
+      if selected then
+        local tiles = math.max(1, math.ceil((textWidth + 8) / 8))
+        local contentW = tiles * 8
+        local boxW, boxH = (tiles + 2) * 8, 24
+        local boxX = math.floor(anchorX - boxW / 2 + 0.5)
+        local boxY = math.floor(anchorY - boxH / 2 + 0.5)
+        boxX = math.max(minX, math.min(maxX - boxW, boxX))
+        boxY = math.max(minY, math.min(maxY - boxH, boxY))
+        Chrome.mapPopupFrame(boxX, boxY, tiles)
+        local textX = boxX + 8 + math.floor((contentW - textWidth) / 2)
+        FrlgFont.draw(label, textX, boxY + 5,
+          { colors = FrlgFont.COLOR.NORMAL, maxWidth = contentW })
+      else
+        local x = math.floor(anchorX - textWidth / 2)
+        local y = math.floor(anchorY - 4)
+        x = math.max(minX, math.min(maxX - textWidth, x))
+        y = math.max(minY, math.min(maxY - 8, y))
+        FrlgFont.draw(label, x, y, { colors = FrlgFont.COLOR.WHITE })
+      end
+    end
+    for i, item in ipairs(items) do
+      if i ~= Gen3Radial.selected then drawItem(i, item, false) end
+    end
+    if Gen3Radial.selected and items[Gen3Radial.selected] then
+      drawItem(Gen3Radial.selected, items[Gen3Radial.selected], true)
+    end
+    g.pop()
+    g.setColor(1, 1, 1, 1)
+  end
+
   local function open(game, ev)
     if active or not config().enabled or not shared.canOpenMenu(game) then
       return false
     end
-    -- The radial is a pushed Gen 1 screen.  FireRed has no state stack to
-    -- push it onto, so the menu hotkeys carry that generation instead.
-    if not shared.chromeAvailable(game) then return false end
     local items = shared.refreshStartMenuItems(game)
     if #items == 0 then return false end
     local cfg = config()
-    Screens.push(game, "HotkeySuiteRadial", items, cfg.stick, ev and ev.joystick)
+    if shared.chromeAvailable(game) then
+      Screens.push(game, "HotkeySuiteRadial", items, cfg.stick, ev and ev.joystick)
+    elseif Stack and Chrome and FrlgFont then
+      -- FireRed has no `game.stack` to push a Gen 1 screen onto; the wheel
+      -- goes on FireRed's own modal stack instead, drawn by Gen3Radial above.
+      Gen3Radial.game, Gen3Radial.items = game, items
+      Gen3Radial.stick, Gen3Radial.joystick = cfg.stick, ev and ev.joystick
+      Gen3Radial.x, Gen3Radial.y, Gen3Radial.selected, Gen3Radial.fade = 0, 0, nil, 0
+      active = Gen3Radial
+      Stack.push("hotkey_suite_radial", Gen3Radial)
+    else
+      return false
+    end
     neutralize(active)
     return true
   end
@@ -166,8 +286,19 @@ return function(mod, suite)
       save(cfg)
       if active then active:close(false) end
     end,
-    onFire = function(game, ev) open(game, ev) end,
+    onFire = function(game, ev)
+      -- canOpenMenu inside open() gives the same "player is mid-step" busy
+      -- answer every generation gives a caller from outside a single frame's
+      -- own input poll (see shared.lua's "deferred retry" section), so
+      -- holding the combo while walking is retried each frame instead of
+      -- dropped, opening the wheel the moment the step lands.
+      shared.deferUntilIdle(game, function(g) return open(g, ev) end, "radial")
+    end,
     onBreak = function()
+      -- Aiming stops meaning "select" the instant the combo lets go, whether
+      -- or not the wheel ever actually opened; a still-queued open must not
+      -- spring the wheel open a frame after the player has already let go.
+      shared.cancelDeferred("radial")
       if active then active:close(true) end
     end,
   })
