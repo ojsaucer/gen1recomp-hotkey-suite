@@ -76,7 +76,8 @@ hotkey assigned in one game is already live in all of them.
 | Menu hotkeys | ✅ | ✅ | ✅ |
 | Travel — Bicycle / Return Center | ✅ | ✅ | ✅ |
 | Travel — Fly | ✅ | ✅ | `UNSUPPORTED` |
-| Battle command menu / Battle text / Ball menu | ✅ | ✅ | — |
+| Battle command menu / Ball menu | ✅ | ✅ | ✅ |
+| Battle text | ✅ | ✅ | `PLANNED` |
 | Radial wheel | ✅ | ✅ | ✅ |
 | In-game settings screen | ✅ `OPTIONS` | ✅ `OPTIONS` | ✅ `START` |
 
@@ -84,7 +85,17 @@ hotkey assigned in one game is already live in all of them.
   directly and Gold reaches the same place through its field-move pipeline, but
   FireRed's fly destinations are the region map's town spawn points and nothing
   exposes them, so the row reads `UNSUPPORTED` there and accepts no binding that
-  could never fire. RETURN CENTER and BICYCLE work in all three.
+  could never fire. RETURN CENTER and BICYCLE work in all three, and RETURN
+  CENTER plays a spin-and-fade transition on every generation now — Red's own
+  DIG/TELEPORT animation, Gold's matching DIG/ESCAPE ROPE spin, and FireRed's
+  own teleporter-tile spin (the same one Silph Co's and Sabrina's Gym's warp
+  tiles use) — instead of an instant cut.
+- **Battle Text is not on FireRed/LeafGreen yet.** Auto Text, Level Up, Skip
+  Lv SFX, and Learn Text are Gen 1/2-only for now; the row reads `PLANNED`
+  above and a fix is planned for an upcoming release. Every other Gen 3 row in
+  this table, including the Ball Menu (which opens FireRed's own BAG screen
+  jumped to its BALLS pocket rather than this suite's own picker, since
+  FireRed has no menu stack to push that picker onto), is already live.
 - **Configuring on Gen 3.** FireRed's option list is closed to mods, so the
   suite takes the Start Menu instead, adding a **HOTKEYS** row just above
   **EXIT**. The screen behind that entry is drawn with FireRed's own chrome —
