@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.15.0] - 2026-10-07
+
+### Changed
+
+- **The Gen 3 autofire HUD badge now uses FireRed's own map-name-popup
+  chrome instead of a bare rectangle.** The 1.14.0 badge was drawn honestly
+  but plainly — a flat white-filled, black-bordered box — because that is
+  all `src.render.Font` can draw with. FireRed has its own 9-slice window
+  frame for exactly this kind of floating status banner: `src.ui.game3.chrome`'s
+  `mapPopupFrame`, the same widget the game itself uses to show the map name
+  when you enter a new area (`src.ui.game3.map_name_popup`). The badge now
+  calls that directly — same frame graphic the player's own window-frame
+  choice already uses everywhere else in FireRed's UI, same centered text via
+  `FrlgFont.draw` with `FrlgFont.COLOR.NORMAL` (the game's standard body-text
+  color, not the small control-info style) — and sizes the frame's tile width
+  to just fit "AUTOFIRE" once at load time, rather than reusing the game's own
+  coarse map-name-length tiers. Gen 1 and Gen 2 are unaffected; they still use
+  `src.render.Font`'s box, since that already matches those games' own HUD
+  style.
+
 ## [1.14.0] - 2026-10-06
 
 ### Added

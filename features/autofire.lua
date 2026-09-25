@@ -1,11 +1,15 @@
 return function(mod, suite)
   local shared = suite.shared
   local Font = require("src.render.Font")
-  -- Optional: only src.ui.game3 builds have this, and even there gen3_ui.lua's
-  -- own guard is what covers a build that is missing it. A nil here just
+  -- Optional: only src.ui.game3 builds have these, and even there gen3_ui.lua's
+  -- own guard is what covers a build that is missing them. A nil here just
   -- means the badge stays Gen 1/2-only, the way it always has.
-  local FrlgFont = select(2, pcall(require, "src.ui.game3.frlg_font"))
-  if type(FrlgFont) ~= "table" then FrlgFont = nil end
+  local function optional(name)
+    local ok, m = pcall(require, name)
+    return (ok and type(m) == "table") and m or nil
+  end
+  local FrlgFont = optional("src.ui.game3.frlg_font")
+  local Chrome = optional("src.ui.game3.chrome")
   local MODES = { "toggle", "hold" }
   local METHODS = { "fixed", "next" }
   local SPEEDS = {
@@ -144,7 +148,19 @@ return function(mod, suite)
     return x, y
   end
 
-  local FRLG_BADGE_TEXT = { fg = { 0, 0, 0, 1 }, shadow = { 0, 0, 0, 0 }, bg = { 0, 0, 0, 0 } }
+  -- FireRed's own map-name popup is the closest thing the cart has to a
+  -- small floating status banner: a 9-slice window in the player's chosen
+  -- frame graphic, with FONT_NORMAL text centered inside it
+  -- (src/ui/game3/map_name_popup.lua:212-241). Reusing Chrome.mapPopupFrame
+  -- for the badge is what makes it look like part of the game rather than a
+  -- rectangle drawn over it; the text is one word and never changes, so its
+  -- width in tiles is measured once rather than every frame.
+  local FRLG_TILES, FRLG_CONTENT_W
+  if FrlgFont then
+    local measured = FrlgFont.measure("AUTOFIRE")
+    FRLG_TILES = math.max(1, math.ceil((measured + 8) / 8))
+    FRLG_CONTENT_W = FRLG_TILES * 8
+  end
 
   mod.hooks:wrap("render.hud", function(next, game, viewport)
     next(game, viewport)
@@ -167,23 +183,25 @@ return function(mod, suite)
       g.rectangle("line", x, y, width, height)
       Font.draw(text, x + 4, y + 4)
       g.pop()
-    elseif FrlgFont then
+    elseif FrlgFont and Chrome then
       -- FireRed has no state stack for the badge to sit on, but its render.hud
       -- payload is a screen-space overlay the same as Gen 1's, just on a
-      -- 240x160 frame -- so the notice is the same box drawn with FireRed's
-      -- own font instead, sized to its own metrics rather than Font.width's.
-      local width = FrlgFont.measure(text, { small = true }) + 8
-      local height = 18
+      -- 240x160 frame -- drawn with the map-name popup's own frame and font
+      -- instead of a bare rectangle, so it reads as FireRed chrome rather
+      -- than a debug overlay.
+      local width, height = (FRLG_TILES + 2) * 8, 24
       local x, y = badgeOrigin(cfg.notice, 240, 160, width, height)
       g.push("all")
       g.origin()
       g.translate(viewport.gameX or 0, viewport.gameY or 0)
       g.scale(viewport.scale or 1)
-      g.setColor(1, 1, 1, 0.9)
-      g.rectangle("fill", x, y, width, height)
-      g.setColor(0, 0, 0, 1)
-      g.rectangle("line", x, y, width, height)
-      FrlgFont.draw(text, x + 4, y + 3, { small = true, colors = FRLG_BADGE_TEXT })
+      Chrome.mapPopupFrame(x, y, FRLG_TILES)
+      local textW = FrlgFont.measure(text)
+      local textX = x + 8 + math.floor((FRLG_CONTENT_W - textW) / 2)
+      FrlgFont.draw(text, textX, y + 5, {
+        colors = FrlgFont.COLOR.NORMAL, maxWidth = FRLG_CONTENT_W,
+      })
+      g.setColor(1, 1, 1, 1)
       g.pop()
     end
   end)
