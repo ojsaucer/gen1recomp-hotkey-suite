@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.13.0] - 2026-10-05
+
+### Added
+
+- **A QUICK EXIT setting on Gen 3's MENU HOTKEYS screen, directly below
+  ENABLED, on by default.** On Red and Gold, `activateMenuItem`'s
+  `closeMenus()` unwinds the whole stack before pushing the chosen screen, so
+  a menu hotkey never puts the Start Menu on screen at all — CANCEL already
+  lands back in the overworld in one press. FireRed cannot dispatch that way:
+  `src/ui/game3/start_menu.lua`'s `confirm()` is the only entry point in, and
+  it requires the Start Menu to already be open (Gen3Compat backs it with
+  `Hud.openStartMenu`). Canceling out of, say, BAG used to return to a Start
+  Menu the player never opened, needing a second CANCEL to reach the
+  overworld. QUICK EXIT closes that gap: once whatever the hotkey opened has
+  been backed out of and the Start Menu is the only thing left on FireRed's
+  own UI stack, it is closed automatically too, landing exactly where Red and
+  Gold already do. Turning it OFF restores the Start-Menu-behind-it behaviour,
+  the same as pressing START yourself would leave. The setting has no effect
+  on Red or Gold, which were never affected by the gap.
+
 ## [1.12.0] - 2026-10-04
 
 ### Added

@@ -6,6 +6,7 @@ return {
     changed = {
       "OPTIONS gains one HOTKEY SUITE entry with input, feature, and settings submenus; on FireRed and LeafGreen it is the Start Menu that gains it",
       "menu hotkeys and the radial menu discover every live START-menu item, including mod-added entries",
+      "on FireRed and LeafGreen, MENU HOTKEYS gains a QUICK EXIT setting (on by default) so CANCEL backs a hotkey-opened menu straight out to the overworld instead of leaving the Start Menu open behind it",
     },
     added = {
       "every module carries an ENABLED master switch that ships OFF with no hotkey bound",

@@ -86,11 +86,17 @@ hotkey assigned in one game is already live in all of them.
   exposes them, so the row reads `UNSUPPORTED` there and accepts no binding that
   could never fire. RETURN CENTER and BICYCLE work in all three.
 - **Configuring on Gen 3.** FireRed's option list is closed to mods, so the
-  suite takes the Start Menu instead and sits just above **EXIT**. The screen
-  behind that entry is drawn with FireRed's own chrome — its window frames, its
-  font, its dimmed-row selection — but it is the same menu: same tree, same
-  buttons, same help on **START**. Bindings are stored per installation, so a
-  hotkey assigned on Red is already live on FireRed and vice versa.
+  suite takes the Start Menu instead, adding a **HOTKEYS** row just above
+  **EXIT**. The screen behind that entry is drawn with FireRed's own chrome —
+  its window frames, its font, its dimmed-row selection — but it is the same
+  menu: same tree, same buttons, same help on **START**. Bindings are stored
+  per installation, so a hotkey assigned on Red is already live on FireRed and
+  vice versa.
+- **QUICK EXIT (Gen 3 only).** A setting on MENU HOTKEYS, on by default, that
+  backs CANCEL out of a hotkey-opened menu straight to the overworld instead
+  of leaving the Start Menu open behind it — matching how Red and Gold already
+  behave, since they never put the Start Menu on screen for a hotkey in the
+  first place. Turn it off to get the Start Menu back as an intermediate step.
 - Works alongside custom battle UI mods (Floating Battle HUD, Voxel Ascendant, Kanto Ascendant): the Battle Command Menu detects modded battle layouts and draws a floating legend with real move names instead of fighting for the vanilla cursor.
 
 ---
