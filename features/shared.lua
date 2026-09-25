@@ -761,18 +761,46 @@ return function(mod, suite)
   -- acceptsMenuInput (src/world/gen2/World.lua), Gen3Compat.worldBusy (Gen 3)
   -- -- so a hotkey fired the instant the player started a step used to be
   -- silently swallowed instead of landing where the cart's own input would
-  -- have. shared.deferUntilIdle keeps a rejected attempt alive across
-  -- input.step instead of discarding it, retrying every frame for a healthy
-  -- multiple of the longest walk step (16 frames on foot, 8 on a bike)
-  -- before giving up -- long enough that the request still lands the moment
-  -- the world stops being busy the way it would from inside the ROM's own
-  -- loop, but not so long that a press thrown into a script or a battle
-  -- queues for a small eternity. There is no cheaper way to tell "still
-  -- walking" from "started a cutscene" apart without re-deriving every
-  -- engine's own busy reasons, and a handful of wasted retries is a low
-  -- price for never losing a press the player could see land.
+  -- have.
+  --
+  -- A plain per-frame retry (input.step) is not enough on its own: each
+  -- engine's own step loop (Player.update/OverworldController.update) clears
+  -- its "moving" flag and, in the same synchronous call, immediately re-sets
+  -- it the instant it finds the direction still held for the next step --
+  -- pokefirered/src/field_player_avatar.c's own chaining does the same
+  -- thing on real hardware, it is just that real hardware's Joypad poll runs
+  -- *inside* that same window instead of from an external event, so it never
+  -- misses it. Nothing outside that one function call ever observes "moving"
+  -- go false while the player holds a direction continuously, so a hotkey
+  -- polling in on its own schedule (input.step) can retry for the entire
+  -- 20-frame budget and still never once land while the player keeps
+  -- walking -- exactly the "requires standing still" symptom.
+  --
+  -- world.stepped (src/world/OverworldController.lua:4603,
+  -- src/world/gen2/World.lua, src/core/game3/player.lua:695) is emitted
+  -- synchronously from inside that very function, right after "moving" is
+  -- cleared and strictly before the same call re-polls the d-pad and can set
+  -- it again -- the one externally observable instant the landing frame
+  -- actually exists across all three engines. Retrying there is what
+  -- actually reproduces "press Start mid-walk and it opens the moment your
+  -- foot lands"; input.step is kept alongside it to still catch every other
+  -- kind of busy (a script or a menu closing) that clears on no particular
+  -- step boundary at all.
   local DEFER_FRAMES = 20
   local deferred = {}
+
+  local function attemptDeferred(consumeBudget)
+    if #deferred == 0 then return end
+    local remaining = {}
+    for _, entry in ipairs(deferred) do
+      local ok, done = pcall(entry.tryFn, entry.game)
+      if not (ok and done) then
+        if consumeBudget then entry.framesLeft = entry.framesLeft - 1 end
+        if entry.framesLeft > 0 then remaining[#remaining + 1] = entry end
+      end
+    end
+    deferred = remaining
+  end
 
   function shared.deferUntilIdle(game, tryFn, tag)
     -- pcall'd the same as every retry below: a tryFn that throws on its very
@@ -781,7 +809,9 @@ return function(mod, suite)
     -- one that throws on attempt 2 onward can.
     local ok, done = pcall(tryFn, game)
     if ok and done then return true end
-    deferred[#deferred + 1] = { tryFn = tryFn, tag = tag, framesLeft = DEFER_FRAMES }
+    deferred[#deferred + 1] = {
+      tryFn = tryFn, tag = tag, game = game, framesLeft = DEFER_FRAMES,
+    }
     return false
   end
 
@@ -797,17 +827,14 @@ return function(mod, suite)
 
   mod.hooks:wrap("input.step", function(next, game, dt)
     next(game, dt)
-    if #deferred == 0 then return end
-    local remaining = {}
-    for _, entry in ipairs(deferred) do
-      local ok, done = pcall(entry.tryFn, game)
-      if not (ok and done) then
-        entry.framesLeft = entry.framesLeft - 1
-        if entry.framesLeft > 0 then remaining[#remaining + 1] = entry end
-      end
-    end
-    deferred = remaining
+    attemptDeferred(true)
   end)
+
+  -- No frame budget spent here on purpose: this is a bonus, exact-instant
+  -- attempt layered on top of the input.step budget above, not a second
+  -- clock racing it. A press still expires after the same ~1/3 second of
+  -- world.stepped-less busy time either way.
+  mod.events:on("world.stepped", function() attemptDeferred(false) end)
 
   function shared.neutralizeStick(game, joystick, stick)
     if not gamepadNext then return false end

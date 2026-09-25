@@ -16,6 +16,10 @@ return function(mod, suite)
   local Stack = optional("src.ui.game3.stack")
   local Chrome = optional("src.ui.game3.chrome")
   local FrlgFont = optional("src.ui.game3.frlg_font")
+  -- Reading the wheel's own labels opens FireRed's real start menu as a side
+  -- effect (see open(), below); StartMenu.close() is what undoes that when
+  -- the wheel closes with nothing selected.
+  local StartMenu = optional("src.ui.StartMenu")
 
   -- Shared between both presentations: which slice of the wheel a stick
   -- deflection lands on, and where the wheel's own center sits for a given
@@ -174,7 +178,24 @@ return function(mod, suite)
     neutralize(self)
     if Stack then Stack.pop("hotkey_suite_radial") end
     if active == self then active = nil end
-    if item then shared.activateMenuItem(self.game, item.id) end
+    if item and type(item.activate) == "function" then
+      -- Not shared.activateMenuItem: its canOpenMenu gate would see the
+      -- start menu open() already opened just to read its entries for the
+      -- wheel's labels (Gen3Compat backs StartMenu.new with
+      -- Hud.openStartMenu, unlike Gen 1/2's `new` which only builds an
+      -- unshown object) and refuse, on the grounds that a menu is open --
+      -- true, but only because this very call opened it, so every selection
+      -- silently did nothing and left that plain start menu on screen. item
+      -- carries the same resolved activator shared.activateMenuItem would
+      -- have looked up anyway (extractMenuItems already ran menu.activator
+      -- over it in shared.lua), so calling it straight through is both
+      -- correct and the only path that still works with the menu already up.
+      item.activate(self.game)
+    elseif StartMenu and type(StartMenu.close) == "function" then
+      -- Nothing selected: leave the field exactly as it was rather than the
+      -- plain start menu that open() had to open to read its own entries.
+      StartMenu.close()
+    end
   end
 
   -- Consumes input outright while the wheel is up, the same as a Gen 1

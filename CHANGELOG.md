@@ -5,8 +5,9 @@
 ### Fixed
 
 - **Menu, radial, and travel hotkeys (FLY / RETURN TO CENTER / BICYCLE) no
-  longer drop a press thrown while the player is mid-step.** Vanilla never
-  actually loses a START/A press thrown mid-step: `PlayerMovement` answering
+  longer drop a press thrown while the player is mid-step, including while a
+  direction is held down continuously.** Vanilla never actually loses a
+  START/A press thrown mid-step: `PlayerMovement` answering
   `PLAYERMOVEMENT_CONTINUE` just defers the whole poll to that step's landing
   frame, where it is acted on as though nothing had happened. Every engine's
   own "is a menu safe to open right now" gate (Gen 1's internal
@@ -18,10 +19,32 @@
   never looked at movement), so the drop was really only visible on Gen 3,
   where it made every menu/radial/travel hotkey feel unreliable while
   walking or biking. A hotkey press that finds the world busy is now kept
-  alive and retried every frame for up to a third of a second — long enough
-  to always land the moment a step finishes, short enough that a press
-  thrown right before a real cutscene or battle just expires quietly rather
-  than queuing for a lifetime — instead of being silently swallowed.
+  alive and retried every frame for up to a third of a second. The first cut
+  of this only retried from `input.step`, which polls on its own schedule —
+  but every generation clears and, if a direction is still held, immediately
+  re-sets its own "moving" flag within the same synchronous landing-frame
+  call, so `input.step`'s independent poll could never actually observe the
+  one instant the world was genuinely idle while walking or biking
+  continuously, and the hotkey kept losing that race until the player let go
+  of the d-pad entirely. The retry now also fires for free (without
+  spending any of that budget) from the `world.stepped` event every
+  generation's own step-completion code already emits at that exact idle
+  instant, so it reliably lands mid-walk instead of requiring the player to
+  stand still first — short enough that a press thrown right before a real
+  cutscene or battle still just expires quietly rather than queuing for a
+  lifetime.
+
+- **The Gen 3 radial menu now activates the wedge the player actually
+  selected, instead of always opening the plain start menu.** Reading the
+  wheel's own labels calls the same `StartMenu.new` FireRed uses to build
+  its real start menu, which — unlike Gen 1/2's inert equivalent — visibly
+  opens it as a side effect purely to enumerate its rows; the radial then
+  hid it behind the wheel and, on release, tried to activate the chosen item
+  through the same busy-gated path menu hotkeys use, which always refused
+  because that self-opened start menu still counted as "the world is busy."
+  Selecting a wedge now activates it directly instead of re-checking that
+  gate, and releasing the wheel with nothing selected now explicitly closes
+  the leftover start menu instead of leaving it on screen.
 
 ### Added
 
