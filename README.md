@@ -10,8 +10,7 @@ Configure everything from one place:
 > suite changes nothing about how the game plays until you opt in. Open a module,
 > flip **ENABLED** to **ON**, then assign the hotkeys you want.
 
-Settings are saved per installation, not per save file, and are written to disk
-the moment you change them. Press **START** on any setting for help.
+Press **START** on any setting for help.
 
 ---
 
@@ -20,29 +19,29 @@ the moment you change them. Press **START** on any setting for help.
 Each module below has its own **ENABLED** master switch (**OFF** by default).
 
 ### ⚡ Autofire Hotkeys
-- **Toggle or Hold** activation with 5 adjustable repeat speeds.
-- Supports **Fixed Target** (any Game Boy button) or **Next Input** mode.
+- **Toggle or Hold** activation with adjustable repeat speeds.
+- Supports **Fixed Target** or **Next Input** mode.
 - Optional on-screen HUD status indicator with customizable position.
 
 ### 📜 Menu Hotkeys & Radial Menu
-- **Instant Shortcuts:** Bind any START-menu option to single buttons or multi-key combos (up to 4 inputs).
+- **Instant Shortcuts:** Bind any START-menu option to single button/multi-key combos (up to 4 inputs).
 - **Dynamic Mod Discovery:** Automatically finds and binds menu tabs added by other mods (such as Kanto Ascendant).
-- **Radial Wheel:** Hold a hotkey, point either analog stick, and release to select. Includes 9 screen anchor positions.
+- **Radial Wheel:** Hold a hotkey, point either analog stick, and release to select.
 - **Swap Without Backing Out:** Opening a different menu hotkey closes whatever menu is currently open first, so you can jump straight from one menu to another.
 
 ### 🚲 Travel Hotkeys (Overworld)
-- **Fly:** Instant Town Map flight when HM02 is in your Bag.
+- **Fly:** Instant Town Map flight when HM02 is in your Bag. **(Gen 3 currently unsupported for this specific function)**
 - **Return to Pokémon Center:** Immediate teleport to your last visited Pokémon Center.
 - **Bicycle:** Fast toggle whenever the Bicycle is in your Bag.
 
 ### ⚔️ Battle Command Menu
-- **Command Mode:** Hold a hotkey and press D-Pad / Direction keys (`Up`, `Right`, `Left`, `Down`) to directly select **FIGHT**, **PKMN**, **ITEM**, or **RUN**—or choose moves 1–4.
+- **Command Mode:** Hold a hotkey and press D-Pad / Direction keys (`Up`, `Right`, `Left`, `Down`) to directly select **FIGHT**, **PKMN**, **ITEM**, or **RUN**—just like in Pokemon Stadium.
 - **Instant Run:** Dedicated hotkey to attempt fleeing directly from the main battle menu.
 - **Custom Battle UI Compatible:** Automatically adapts to modded battle UIs (e.g. Floating Battle HUD, Voxel Ascendant) with a floating directional legend and real move names.
 - **Move Info:** Optionally adds a second line to each move showing its attack power beside a sword icon, its type abbreviated to three characters, and its accuracy as `##%`.
 - **UI Layout & Scale:** Choose `AUTO`, `GRID 2x2`, or `LIST 1x4`, with scales from 50% to 150%. The legend anchors to the playfield and shrinks to fit, so it stays on screen even in portrait on mobile.
 
-### 💬 Battle Text
+### 💬 Battle Text - **(Gen 3 currently unsupported)**
 - **Auto Text:** Automatically advances battle messages at a configurable speed (`Slow`, `Medium`, `Fast`, `Very Fast`) while leaving menus, move selection, and yes/no prompts fully under your control. This includes the messages that run on their own window over the battle, such as the "1, 2 and… Poof!" sequence after a move is forgotten.
 - **Level Up:** Also dismisses the level-up stat window automatically.
 - **Skip Lv SFX:** Skips the level-up fanfare and the one for learning a new move, removing the pause the game takes to play them. Fanfares for catching a Pokémon, new Pokédex entries, and winning a battle are untouched.
@@ -83,32 +82,19 @@ hotkey assigned in one game is already live in all of them.
 
 - **FLY** is the one action an engine can withhold. Red hands it to mods
   directly and Gold reaches the same place through its field-move pipeline, but
-  FireRed's fly destinations are the region map's town spawn points and nothing
-  exposes them, so the row reads `UNSUPPORTED` there and accepts no binding that
-  could never fire. RETURN CENTER and BICYCLE work in all three, and RETURN
-  CENTER plays a spin-and-fade transition on every generation now — Red's own
-  DIG/TELEPORT animation, Gold's matching DIG/ESCAPE ROPE spin, and FireRed's
-  own teleporter-tile spin (the same one Silph Co's and Sabrina's Gym's warp
-  tiles use) — instead of an instant cut.
+  FireRed works differently.
 - **Battle Text is not on FireRed/LeafGreen yet.** Auto Text, Level Up, Skip
   Lv SFX, and Learn Text are Gen 1/2-only for now; the row reads `PLANNED`
   above and a fix is planned for an upcoming release. Every other Gen 3 row in
   this table, including the Ball Menu (which opens FireRed's own BAG screen
   jumped to its BALLS pocket rather than this suite's own picker, since
   FireRed has no menu stack to push that picker onto), is already live.
-- **Configuring on Gen 3.** FireRed's option list is closed to mods, so the
-  suite takes the Start Menu instead, adding a **HOTKEYS** row just above
-  **EXIT**. The screen behind that entry is drawn with FireRed's own chrome —
-  its window frames, its font, its dimmed-row selection — but it is the same
-  menu: same tree, same buttons, same help on **START**. Bindings are stored
-  per installation, so a hotkey assigned on Red is already live on FireRed and
-  vice versa.
 - **QUICK EXIT (Gen 3 only).** A setting on MENU HOTKEYS, on by default, that
   backs CANCEL out of a hotkey-opened menu straight to the overworld instead
   of leaving the Start Menu open behind it — matching how Red and Gold already
   behave, since they never put the Start Menu on screen for a hotkey in the
   first place. Turn it off to get the Start Menu back as an intermediate step.
-- Works alongside custom battle UI mods (Floating Battle HUD, Voxel Ascendant, Kanto Ascendant): the Battle Command Menu detects modded battle layouts and draws a floating legend with real move names instead of fighting for the vanilla cursor.
+- Tested alongside Gen 1 + 2 custom battle UI mods (Floating Battle HUD, Voxel Ascendant, Kanto Ascendant): the Battle Command Menu detects modded battle layouts and draws a floating legend with real move names instead of fighting for the vanilla cursor.
 
 ---
 
