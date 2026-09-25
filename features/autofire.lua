@@ -1,6 +1,11 @@
 return function(mod, suite)
   local shared = suite.shared
   local Font = require("src.render.Font")
+  -- Optional: only src.ui.game3 builds have this, and even there gen3_ui.lua's
+  -- own guard is what covers a build that is missing it. A nil here just
+  -- means the badge stays Gen 1/2-only, the way it always has.
+  local FrlgFont = select(2, pcall(require, "src.ui.game3.frlg_font"))
+  if type(FrlgFont) ~= "table" then FrlgFont = nil end
   local MODES = { "toggle", "hold" }
   local METHODS = { "fixed", "next" }
   local SPEEDS = {
@@ -129,29 +134,58 @@ return function(mod, suite)
     end
   end)
 
+  -- Screen size and how to draw text differ by generation; the corner-and-
+  -- placement math (what "TOP RIGHT" or "BOTTOM CENTER" means in pixels)
+  -- does not, so it is factored out once and fed the frame's own dimensions.
+  local function badgeOrigin(notice, screenW, screenH, width, height)
+    local x = notice:find("right", 1, true) and (screenW - width - 2)
+      or (notice:find("center", 1, true) and math.floor((screenW - width) / 2) or 2)
+    local y = notice:find("bottom", 1, true) and (screenH - height - 2) or 2
+    return x, y
+  end
+
+  local FRLG_BADGE_TEXT = { fg = { 0, 0, 0, 1 }, shadow = { 0, 0, 0, 0 }, bg = { 0, 0, 0, 0 } }
+
   mod.hooks:wrap("render.hud", function(next, game, viewport)
     next(game, viewport)
     local cfg = config()
     if not state.active or cfg.mode ~= "toggle" or cfg.notice == "off"
         or not viewport then return end
-    -- The notice is drawn with the Gen 1 font on a 160x144 frame.  Autofire
-    -- itself still runs on FireRed -- only its badge is withheld.
-    if not shared.chromeAvailable(game) then return end
-    local text, width, height = "AUTOFIRE", Font.width("AUTOFIRE") + 8, 16
-    local x = cfg.notice:find("right", 1, true) and (160 - width - 2)
-      or (cfg.notice:find("center", 1, true) and math.floor((160 - width) / 2) or 2)
-    local y = cfg.notice:find("bottom", 1, true) and (144 - height - 2) or 2
+    local text = "AUTOFIRE"
     local g = love.graphics
-    g.push("all")
-    g.origin()
-    g.translate(viewport.gameX or 0, viewport.gameY or 0)
-    g.scale(viewport.scale or 1)
-    g.setColor(1, 1, 1, 0.9)
-    g.rectangle("fill", x, y, width, height)
-    g.setColor(0, 0, 0, 1)
-    g.rectangle("line", x, y, width, height)
-    Font.draw(text, x + 4, y + 4)
-    g.pop()
+    if shared.chromeAvailable(game) then
+      -- Gen 1 and Gen 2 share the src.render.Font atlas on a 160x144 frame.
+      local width, height = Font.width(text) + 8, 16
+      local x, y = badgeOrigin(cfg.notice, 160, 144, width, height)
+      g.push("all")
+      g.origin()
+      g.translate(viewport.gameX or 0, viewport.gameY or 0)
+      g.scale(viewport.scale or 1)
+      g.setColor(1, 1, 1, 0.9)
+      g.rectangle("fill", x, y, width, height)
+      g.setColor(0, 0, 0, 1)
+      g.rectangle("line", x, y, width, height)
+      Font.draw(text, x + 4, y + 4)
+      g.pop()
+    elseif FrlgFont then
+      -- FireRed has no state stack for the badge to sit on, but its render.hud
+      -- payload is a screen-space overlay the same as Gen 1's, just on a
+      -- 240x160 frame -- so the notice is the same box drawn with FireRed's
+      -- own font instead, sized to its own metrics rather than Font.width's.
+      local width = FrlgFont.measure(text, { small = true }) + 8
+      local height = 18
+      local x, y = badgeOrigin(cfg.notice, 240, 160, width, height)
+      g.push("all")
+      g.origin()
+      g.translate(viewport.gameX or 0, viewport.gameY or 0)
+      g.scale(viewport.scale or 1)
+      g.setColor(1, 1, 1, 0.9)
+      g.rectangle("fill", x, y, width, height)
+      g.setColor(0, 0, 0, 1)
+      g.rectangle("line", x, y, width, height)
+      FrlgFont.draw(text, x + 4, y + 3, { small = true, colors = FRLG_BADGE_TEXT })
+      g.pop()
+    end
   end)
 
   local function rows(_, inputId)

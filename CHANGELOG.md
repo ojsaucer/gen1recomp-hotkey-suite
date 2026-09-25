@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.14.0] - 2026-10-06
+
+### Added
+
+- **The autofire HUD badge now draws on Gen 3.** It was withheld outright
+  before — autofire itself always ran on FireRed, only its on-screen notice
+  did not, because the badge was drawn with `src.render.Font` against a
+  160x144 frame, a size and an atlas FireRed does not have. It is now drawn a
+  second way when FireRed's own `src.ui.game3.frlg_font` is available: same
+  box, same corner placement, same TOP LEFT / TOP RIGHT / BOTTOM LEFT /
+  BOTTOM RIGHT / TOP CENTER / BOTTOM CENTER choices, sized against FireRed's
+  actual 240x160 frame and its own font metrics rather than Gen 1's. Parity
+  was the point of the suite; a vital piece of the autofire experience being
+  silently absent on one generation was the last place it fell short of that.
+
 ## [1.13.0] - 2026-10-05
 
 ### Added

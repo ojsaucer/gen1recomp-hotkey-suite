@@ -22,7 +22,7 @@ return {
     known = {
       "the superseded standalone autofire_hotkey, menu_hotkeys, and radial_menu mods must remain disabled",
       "nothing in the suite reacts to input until a module is switched ON and a hotkey is assigned",
-      "on FireRed and LeafGreen the radial menu and the autofire HUD badge are withheld; every other module is configurable in game from START > HOTKEY SUITE",
+      "on FireRed and LeafGreen the radial menu is withheld; every other module, including the autofire HUD badge, is configurable in game from START > HOTKEY SUITE",
       "Fly takes no binding on FireRed and LeafGreen; the engine exposes no seam to their region-map destinations",
     },
   },
