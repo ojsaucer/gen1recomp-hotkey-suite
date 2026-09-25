@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.17.3] - 2026-10-09
+
+### Added
+
+- **Ball hotkey (BALL MENU / QUICK THROW) now works on Gen 3.** Previously a
+  no-op on FireRed (`battleState` never finds a stack-based battle object
+  there, so the feature's own readiness check always failed). QUICK THROW
+  resolves a ball from the BAG's own BALLS pocket (read the same way
+  `src/ui/game3/bag_menu.lua`'s own list view does, through `Bag.listPocket`,
+  not the name-keyed `save.inventory` proxy that has no `__pairs` and would
+  enumerate nothing — the same dead end the BICYCLE fix already found) and
+  throws it outright. BALL MENU opens FireRed's own BAG screen jumped
+  straight to its BALLS pocket, since FireRed has no `game.stack` to push
+  this suite's own picker screen onto. A Safari sub-battle has only one ball
+  type and no BAG row at all, so both modes just submit the command menu's
+  own BALL row directly.
+
+### Fixed
+
+- **Gen 3's command/move-list arrow glyphs still showed on top of FireRed's
+  own "▶" cursor pip on the selected row.** 1.17.2 fixed this by skipping
+  the mod's own glyph on that one row, leaving the native pip as the only
+  marker there — inconsistent with every other row, which shows the mod's
+  glyph instead. Fixed properly by hiding the native pip outright (blanking
+  `Window.cursorPx` for the one draw the mod's own glyphs are up) so every
+  row shows its own glyph and none show the native arrow.
+
 ## [1.17.2] - 2026-10-09
 
 ### Added

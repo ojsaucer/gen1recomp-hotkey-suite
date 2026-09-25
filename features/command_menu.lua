@@ -19,6 +19,13 @@ return function(mod, suite)
   -- drawArrow below reuses that generation's own font code point 0xED rather
   -- than tracing a new one.
   local FrlgFont = optionalG3("src.ui.game3.frlg_font")
+  -- Window.cursorPx is the exact call src/core/game3/battle/ui.lua's own
+  -- draw_action_menu/draw_move_menu make to draw FireRed's native "->"
+  -- selector pip; hiding it for the one frame this suite's own overlay
+  -- glyphs are up (see withNativeCursorHidden below) is what keeps the two
+  -- from ever being visible on the same pixel at once, since the mod glyphs
+  -- otherwise land within a couple pixels of it (see G3_COMMAND_ARROW_XY).
+  local G3Window = optionalG3("src.ui.game3.window")
 
   local COMMANDS = {
     up = { index = 1, action = "fight", label = "FIGHT" },
@@ -37,11 +44,10 @@ return function(mod, suite)
 
   -- Where FireRed itself puts each row's own selection pip, straight from
   -- src/core/game3/battle/ui.lua's draw_action_menu/draw_move_menu (the
-  -- `cursorPos` tables there), nudged 2px left of that exact spot -- close
-  -- enough to still read as "this row's" marker on every screen size, but
-  -- off the one pixel Ui's own cursor draws on so the two glyphs don't have
-  -- to share a spot (see drawGen3CommandUI below for the other half of
-  -- that: skipping the currently-selected row entirely).
+  -- `cursorPos` tables there), nudged 2px left of that exact spot.  The
+  -- native pip itself is hidden for that same row while this overlay is up
+  -- (withNativeCursorHidden below), so this is purely the cosmetic 2px
+  -- nudge, not an overlap dodge.
   local G3_COMMAND_ARROW_XY = { { 126, 122 }, { 174, 122 }, { 126, 138 }, { 174, 138 } }
   local G3_MOVE_ARROW_XY = { { 6, 122 }, { 78, 122 }, { 6, 138 }, { 78, 138 } }
   local G3_DIRECTION_GLYPH -- filled in below once FrlgFont is known to exist
@@ -519,34 +525,56 @@ return function(mod, suite)
   -- there is nothing to draw *instead* of it. What was missing is the same
   -- "which physical key does this row" marker Gen 1/2's overlay draws at each
   -- corner; drawn here with FireRed's own arrow glyphs (see G3_DIRECTION_GLYPH
-  -- above) near the pixel Ui's own cursor uses for that row -- except on the
-  -- row that's actually selected, where Ui already draws its own "->" pip at
-  -- that exact spot and this glyph would only double up on top of it.
+  -- above) near the pixel Ui's own cursor uses for that row.  The native
+  -- "->" pip itself is hidden for the duration of this draw (see
+  -- withNativeCursorHidden, wrapped around the "next(game, viewport)" call
+  -- below that actually draws it), so every row gets its own glyph without
+  -- either one drawing over the other.
   local function drawGen3CommandUI(viewport)
     if not (FrlgFont and G3) then return end
     local commandOpen = G3.commandMenuOpen()
     local moveOpen = not commandOpen and G3.moveSelectOpen()
     if not (commandOpen or moveOpen) then return end
     local positions = commandOpen and G3_COMMAND_ARROW_XY or G3_MOVE_ARROW_XY
-    local selected = G3.selectedIndex and G3.selectedIndex()
     local g = love.graphics
     g.push("all")
     g.origin()
     g.translate(viewport.gameX or 0, viewport.gameY or 0)
     g.scale(viewport.scale or 1)
     for index, direction in ipairs(DIRECTION_FOR_INDEX) do
-      if index ~= selected then
-        local pos = positions[index]
-        local glyph = G3_DIRECTION_GLYPH[direction]
-        if pos and glyph then
-          FrlgFont.drawGlyph(glyph, pos[1], pos[2], {
-            colors = FrlgFont.COLOR.NORMAL,
-          })
-        end
+      local pos = positions[index]
+      local glyph = G3_DIRECTION_GLYPH[direction]
+      if pos and glyph then
+        FrlgFont.drawGlyph(glyph, pos[1], pos[2], {
+          colors = FrlgFont.COLOR.NORMAL,
+        })
       end
     end
     g.pop()
   end
+
+  -- Blanks out FireRed's own command/move-list selector pip (the same
+  -- Window.cursorPx call src/core/game3/battle/ui.lua's draw_action_menu/
+  -- draw_move_menu make) for exactly one draw, so the frame's real battle
+  -- render -- called from inside `body()` -- never puts that pip on screen
+  -- for this suite's own row glyphs to land next to. Gated on the command
+  -- or move menu actually being open (so no other screen that happens to
+  -- reuse cursorPx, like the start menu or a list menu, loses its own
+  -- cursor for a frame it was never asked to) and on the hotkeys actually
+  -- being held (so the native pip is never hidden with nothing of this
+  -- suite's own drawn to replace it).
+  local function withNativeCursorHidden(body)
+    local hide = FrlgFont and G3Window and G3
+      and (active.keyboard or active.gamepad)
+      and (G3.commandMenuOpen() or G3.moveSelectOpen())
+    if not hide then return body() end
+    local original = G3Window.cursorPx
+    G3Window.cursorPx = function() end
+    local ok, err = pcall(body)
+    G3Window.cursorPx = original
+    if not ok then error(err, 0) end
+  end
+
 
   -- DEFAULT MOVES sends the fresh command menu straight into the move list
   -- instead of leaving FIGHT/PKMN/ITEM/RUN on screen, one synthetic FIGHT
@@ -586,7 +614,7 @@ return function(mod, suite)
   end)
 
   mod.hooks:wrap("render.hud", function(next, game, viewport)
-    next(game, viewport)
+    withNativeCursorHidden(function() next(game, viewport) end)
     touchRects = {}
     customLegend = nil
     local battle = battleState(game)

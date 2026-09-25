@@ -361,23 +361,114 @@ return function(mod, suite)
     return true
   end
 
-  -- Whichever row Ui's own cursor sits on right now -- the same index its
-  -- native "->" selector pip draws at (src/ui/game3/window.lua's cursorPx,
-  -- same pixel this suite's command-menu overlay reuses).  Callers use this
-  -- to skip drawing their own row marker on top of that native pip instead
-  -- of guessing at a second, non-colliding spot for it.
-  function gen3battle.selectedIndex()
-    if gen3battle.commandMenuOpen() then return G3Ui._menuIndex end
-    if gen3battle.moveSelectOpen() then return G3Ui._moveIndex end
-    return nil
-  end
-
   -- FIGHT is row 1 of the normal menu, but row 1 of a Safari battle's menu
   -- is BALL (commands.lua's SAFARI_MENU) -- there is no move list to jump
   -- into there, so this refuses instead of spending the player's balls.
   function gen3battle.submitFight()
     if G3Ui._st and G3Ui._st.safari then return false end
     return gen3battle.submitCommand(1)
+  end
+
+  -- The BAG's own BALLS pocket (pret's third pocket, id "POKE_BALLS"), read
+  -- the same way src/ui/game3/bag_menu.lua's own list view does: through
+  -- Bag.listPocket, not the name-keyed save.inventory proxy travel.lua's
+  -- BICYCLE fix already found has no __pairs and would enumerate nothing.
+  -- A Safari sub-battle has no BAG row at all (Commands.SAFARI_MENU), so its
+  -- one ball type is reported from st.safariState.balls instead.
+  local function ballSession()
+    local Runtime = optionalG3("src.core.game3.runtime")
+    return Runtime and Runtime.getSession and Runtime.getSession()
+  end
+
+  -- Whether the player's current battle is a Safari sub-battle -- checked
+  -- directly rather than inferred from ballBag()'s result, so "no Safari
+  -- balls remain" (ballBag() empty) is never confused with "not a Safari
+  -- battle" (no BAG to open at all) by a caller deciding whether it may
+  -- fall back to openBallBag().
+  function gen3battle.isSafariBattle()
+    return gen3battle.active() and G3Ui._st ~= nil and G3Ui._st.safari == true
+  end
+
+  function gen3battle.ballBag()
+    if not gen3battle.active() then return {} end
+    local st = G3Ui._st
+    if st and st.safari then
+      local count = st.safariState and tonumber(st.safariState.balls) or 0
+      if count <= 0 then return {} end
+      return { { id = "SAFARI_BALL", name = "SAFARI BALL", count = count,
+        safari = true } }
+    end
+    local Bag = optionalG3("src.core.game3.bag")
+    local session = ballSession()
+    local bag = session and session.bag
+    if not (Bag and bag) then return {} end
+    local rows = Bag.listPocket(bag, "POKE_BALLS")
+    local out = {}
+    for _, row in ipairs(rows) do
+      out[#out + 1] = { id = row.id, name = row.name, count = row.qty }
+    end
+    return out
+  end
+
+  -- BY_HOST already keys FRLG's four standard balls by this exact
+  -- underscored spelling (items_data.lua's ItemsData.BY_HOST), so no name
+  -- munging is needed to turn a Gen 1/2-style item id into FireRed's own
+  -- numeric one.
+  function gen3battle.itemIdForName(name)
+    local ItemsData = optionalG3("src.core.game3.items_data")
+    return ItemsData and ItemsData.toNumericId and ItemsData.toNumericId(name)
+      or nil
+  end
+
+  -- Spends and throws one BAG ball outright -- the same command
+  -- src/core/game3/battle/ui.lua's own open_battle_bag()'s onBattleUse
+  -- callback builds once the player has picked a ball from the native BAG
+  -- screen (battle/init.lua's command-phase dispatch then reads it back out
+  -- via Ui.takeCommand()) -- so the catch roll, spending the ball and the
+  -- whole CatchSeq stay the engine's own, not reimplemented here.
+  function gen3battle.throwBall(itemId)
+    if not gen3battle.commandMenuOpen() then return false end
+    if not itemId then return false end
+    if G3Ui._st and G3Ui._st.safari then return gen3battle.submitCommand(1) end
+    G3Ui._pendingCommand = { kind = "bag", user = "player", itemId = itemId }
+    G3Ui._mode = "none"
+    return true
+  end
+
+  -- Opens the real BAG screen jumped straight to its BALLS pocket instead
+  -- of the ITEMS pocket a plain ITEM press would land on -- battle/init.lua's
+  -- command-phase dispatch hands every press to BagMenu.handleInput
+  -- exclusively while BagMenu.isOpen(), the same as a native ITEM->BAG
+  -- press would, so once open this needs no input handling of its own.
+  function gen3battle.openBallBag()
+    if not gen3battle.commandMenuOpen() then return false end
+    local BagMenu = optionalG3("src.ui.game3.bag_menu")
+    local session = ballSession()
+    local bag = session and session.bag
+    if not (BagMenu and session and bag) then return false end
+    G3Ui._mode = "bag"
+    BagMenu.show(bag, {
+      session = session,
+      battle = true,
+      pocket = "POKE_BALLS",
+      onBattleUse = function(itemId)
+        if itemId == nil then
+          -- Cancelled: the same 4 fields ui.lua's own local
+          -- restore_action_menu() resets, the exact path a cancelled ITEM
+          -- press already takes.
+          G3Ui._mode = "menu"
+          G3Ui._linger = false
+          G3Ui._timed = nil
+          G3Ui._showing = false
+          local Message = optionalG3("src.ui.game3.message")
+          if Message and Message.open then Message.reset() end
+          return
+        end
+        G3Ui._pendingCommand = { kind = "bag", user = "player", itemId = itemId }
+        G3Ui._mode = "none"
+      end,
+    })
+    return true
   end
 
   shared.battle = battle

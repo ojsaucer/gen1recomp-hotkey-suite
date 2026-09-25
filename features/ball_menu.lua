@@ -42,6 +42,8 @@ return function(mod, suite)
   end
   local function save(cfg) shared.store.set("ballMenu", cfg) end
 
+  local G3 = shared.battle.gen3
+
   local function battleState(game)
     return shared.battle.find(game)
   end
@@ -303,10 +305,56 @@ return function(mod, suite)
     end,
   })
 
+  -- FireRed has no `game.stack` to push the custom picker screen above onto
+  -- (see radial.lua's own comment on the same limitation), so "menu" mode
+  -- reuses the real BAG screen instead of reinventing a second one: jumped
+  -- straight to its BALLS pocket rather than the ITEMS pocket a plain ITEM
+  -- press would land on. battle/init.lua's own command-phase dispatch
+  -- already hands every press to that screen exclusively once it is open
+  -- (BagMenu.isOpen()), so it needs no input handling of its own here, and
+  -- the UI POSITION setting below has no effect on it -- there is nothing
+  -- to move, it is FireRed's own native screen at its own native spot.
+  local function triggerBallActionGen3()
+    if not (G3 ~= nil and G3.commandMenuOpen()) then return false end
+    local cfg = config()
+    -- A Safari sub-battle's only "ball" is the BALL row itself
+    -- (commands.lua's SAFARI_MENU); there is no BAG to open or second type
+    -- to pick between, so both modes just throw it -- checked directly
+    -- rather than inferred from ballBag()'s result, so a Safari battle that
+    -- has just run out of balls refuses cleanly instead of falling through
+    -- to openBallBag() and offering a BAG screen Safari does not have.
+    if G3.isSafariBattle and G3.isSafariBattle() then
+      local balls = G3.ballBag()
+      if not balls[1] then return false end
+      return G3.throwBall(balls[1].id)
+    end
+    local balls = G3.ballBag()
+    if cfg.mode == "quick" then
+      local ballId
+      if cfg.quickBall ~= "FIRST" then
+        local wanted = G3.itemIdForName and G3.itemIdForName(cfg.quickBall)
+        for _, entry in ipairs(balls) do
+          if wanted and entry.id == wanted then
+            ballId = entry.id
+            break
+          end
+        end
+      end
+      if not ballId and balls[1] then ballId = balls[1].id end
+      if ballId then return G3.throwBall(ballId) end
+      -- Configured/first ball is not actually in the bag: fall through to
+      -- the BALLS pocket itself rather than doing nothing, the same as
+      -- Gen 1/2 falling through to BattleState's own "out of balls" refusal
+      -- instead of silently eating the press.
+    end
+    return G3.openBallBag and G3.openBallBag() or false
+  end
+
   local function triggerBallAction(game)
     local cfg = config()
     if not cfg.enabled then return false end
     local battle = battleState(game)
+    if not battle then return triggerBallActionGen3() end
     if not commandReady(battle) then return false end
     local available = getAvailableBalls(battle)
     if cfg.mode == "quick" then
@@ -388,7 +436,8 @@ return function(mod, suite)
         label = "UI POSITION",
         value = function() return POSITION_LABELS[config().position] end,
         help = "Where the ball picker is drawn. Move it clear of any custom "
-          .. "battle UI you have installed.",
+          .. "battle UI you have installed. Has no effect on FireRed, which "
+          .. "shows its own BAG screen instead of this suite's picker.",
         step = function(_, dir)
           local cfg = config()
           cfg.position = shared.cycle(POSITIONS, cfg.position, dir)
