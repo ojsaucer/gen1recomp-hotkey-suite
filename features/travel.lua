@@ -45,13 +45,21 @@ return function(mod, suite)
     return shared.canOpenMenu(game) and shared.world.ownsFrame(game)
   end
 
-  -- Tri-state on purpose.  Red and Gold both keep the bag on game.save, but
-  -- FireRed keeps it on the session and hands mods the raw Game3, so there is
-  -- no inventory to read -- and "I could not find your bag" must never be
-  -- reported to the player as "you do not have one".  nil means unknown, and
-  -- every caller lets the engine's own check refuse instead: useFieldAction
-  -- already gates the BICYCLE on Bag.has (src/world/game3/WorldAPI.lua:219).
+  -- Tri-state on purpose.  Red and Gold both keep the bag on game.save as a
+  -- plain dict this suite's item-name keys match directly.  FireRed's
+  -- game.save.inventory is not absent -- src/mods/Gen3Compat.lua backs it
+  -- with a live Bag-proxy table -- but its lookup goes through
+  -- Gen3Compat.itemId, which does not resolve every Gen 1/2 item name the
+  -- way FireRed's own item list spells it.  BICYCLE is exactly that case:
+  -- FireRed has no item by that name at all, only MACH BIKE and ACRO BIKE,
+  -- so the proxy answered false for players holding either real bike, and
+  -- "A BICYCLE is required" fired despite the bag having one.  Every caller
+  -- lets the engine's own check refuse instead: useFieldAction already gates
+  -- the BICYCLE on Bag.has (src/world/game3/WorldAPI.lua:219), so on
+  -- FireRed this is kept an unconditional nil ("unknown") rather than ever
+  -- trusting a name-keyed answer that cart does not actually use.
   local function hasItem(game, id)
+    if not shared.chromeAvailable(game) then return nil end
     local inventory = game and game.save and game.save.inventory
     if type(inventory) ~= "table" then return nil end
     return (inventory[id] or 0) > 0

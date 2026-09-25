@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.17.1] - 2026-10-09
+
+### Fixed
+
+- **Gen 3 battle command hotkeys had no on-screen indicator at all.** The
+  overlay legend command_menu.lua draws for Gen 1/2 never runs on FireRed
+  (`customBattleUI(battle)` is unconditionally false when there is no
+  `battle` object to check `bottomUIVisible` on), so 1.17.0's Gen 3 support
+  worked but drew nothing to show which key did what. Fixed by drawing
+  FireRed's own `CHAR_UP_ARROW`/`CHAR_DOWN_ARROW`/`CHAR_LEFT_ARROW`/
+  `CHAR_RIGHT_ARROW` glyphs — real ROM-extracted font glyphs already on
+  `src/ui/game3/frlg_font.lua`, not hand-drawn shapes — at the exact pixel
+  `src/core/game3/battle/ui.lua` itself places its own command/move cursor
+  for that row, so the marker sits directly over FireRed's native menu.
+- **The BICYCLE travel hotkey refused with "A BICYCLE is required" on Gen 3
+  even when a bike was in the bag.** `travel.lua`'s `hasItem` reads
+  FireRed's inventory through `Gen3Compat.itemId`, which has no item
+  literally named `BICYCLE` (only `MACH BIKE` / `ACRO BIKE`), so the check
+  always answered false there. `hasItem` now answers unknown on Gen 3 for
+  this case and lets `useFieldAction`'s own `Bag.has` gate decide — the same
+  "let the engine answer" pattern already used for FireRed's `HM_FLY` check
+  just above it.
+
 ## [1.17.0] - 2026-10-09
 
 ### Added

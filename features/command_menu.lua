@@ -8,6 +8,18 @@ return function(mod, suite)
   local touchRects = {}
   local customLegend
 
+  local function optionalG3(name)
+    local ok, found = pcall(require, name)
+    if ok and type(found) == "table" then return found end
+    return nil
+  end
+  -- FireRed's own font sheet already has CHAR_UP/DOWN/LEFT/RIGHT_ARROW (pret's
+  -- page-scroll indicator glyphs) drawn from the ROM-extracted latin_normal
+  -- sheet -- reused here instead of hand-drawn shapes, the same way Gen 1/2's
+  -- drawArrow below reuses that generation's own font code point 0xED rather
+  -- than tracing a new one.
+  local FrlgFont = optionalG3("src.ui.game3.frlg_font")
+
   local COMMANDS = {
     up = { index = 1, action = "fight", label = "FIGHT" },
     right = { index = 2, action = "party", label = "PKMN" },
@@ -22,6 +34,22 @@ return function(mod, suite)
   local DIRECTION_ANGLE = {
     right = 0, down = math.pi / 2, left = math.pi, up = -math.pi / 2,
   }
+
+  -- Where FireRed itself puts each row's own selection pip, straight from
+  -- src/core/game3/battle/ui.lua's draw_action_menu/draw_move_menu (the
+  -- `cursorPos` tables there) -- so the hotkey glyph lands on the exact same
+  -- native (240x160) pixel Ui's own cursor would use for that row, on every
+  -- screen size, rather than a second, guessed-at layout.
+  local G3_COMMAND_ARROW_XY = { { 128, 122 }, { 176, 122 }, { 128, 138 }, { 176, 138 } }
+  local G3_MOVE_ARROW_XY = { { 8, 122 }, { 80, 122 }, { 8, 138 }, { 80, 138 } }
+  local G3_DIRECTION_GLYPH -- filled in below once FrlgFont is known to exist
+  if FrlgFont then
+    G3_DIRECTION_GLYPH = {
+      up = FrlgFont.CHAR_UP_ARROW, right = FrlgFont.CHAR_RIGHT_ARROW,
+      left = FrlgFont.CHAR_LEFT_ARROW, down = FrlgFont.CHAR_DOWN_ARROW,
+    }
+  end
+
   local LEGEND_POSITIONS = {
     "top_left", "top_center", "top_right",
     "bottom_left", "bottom_center", "bottom_right",
@@ -483,11 +511,46 @@ return function(mod, suite)
     end)
   end)
 
+  -- FireRed's own command/move menu is always on screen -- this suite never
+  -- replaces it the way the radial wheel replaces the plain start menu -- so
+  -- there is nothing to draw *instead* of it. What was missing is the same
+  -- "which physical key does this row" marker Gen 1/2's overlay draws at each
+  -- corner; drawn here with FireRed's own arrow glyphs (see G3_DIRECTION_GLYPH
+  -- above) at the exact pixel Ui's own cursor uses for that row.
+  local function drawGen3CommandUI(viewport)
+    if not (FrlgFont and G3) then return end
+    local commandOpen = G3.commandMenuOpen()
+    local moveOpen = not commandOpen and G3.moveSelectOpen()
+    if not (commandOpen or moveOpen) then return end
+    local positions = commandOpen and G3_COMMAND_ARROW_XY or G3_MOVE_ARROW_XY
+    local g = love.graphics
+    g.push("all")
+    g.origin()
+    g.translate(viewport.gameX or 0, viewport.gameY or 0)
+    g.scale(viewport.scale or 1)
+    for index, direction in ipairs(DIRECTION_FOR_INDEX) do
+      local pos = positions[index]
+      local glyph = G3_DIRECTION_GLYPH[direction]
+      if pos and glyph then
+        FrlgFont.drawGlyph(glyph, pos[1], pos[2], {
+          colors = FrlgFont.COLOR.NORMAL,
+        })
+      end
+    end
+    g.pop()
+  end
+
   mod.hooks:wrap("render.hud", function(next, game, viewport)
     next(game, viewport)
     touchRects = {}
     customLegend = nil
     local battle = battleState(game)
+    if not battle then
+      if (active.keyboard or active.gamepad) and viewport then
+        drawGen3CommandUI(viewport)
+      end
+      return
+    end
     if not ((active.keyboard or active.gamepad) and customBattleUI(battle)
         and viewport) then
       return
