@@ -269,6 +269,98 @@ return function(mod, suite)
     return { 8, 112 }
   end
 
+  -- ------------------------------------------------------------- Gen 3 battle
+  --
+  -- FireRed's battle is not a pushed state a mod can find on `game.stack` --
+  -- there is no `game.stack` at all -- it is a pair of engine singletons:
+  -- `src/core/game3/battle` (Battle) owns whether one is running at all, and
+  -- `src/core/game3/battle/ui` (Ui) owns the command/move cursor and reads
+  -- input.  Ui's own cursor fields (`_mode`, `_menuIndex`, `_moveIndex`) are
+  -- plain table fields with no accessor, same as every other Gen 3 reach this
+  -- suite already makes (Field.locked, Player.moving); they are read and
+  -- written directly rather than reinvented behind a facade, because the
+  -- shapes above (a `.phase` string, `:chooseMenu(action)`) describe an
+  -- object FireRed does not have, and forcing one into existence would be a
+  -- second, drifting copy of Ui's own state machine.
+  --
+  -- `Ui.handleInput(input)` -- the same entry point a real d-pad/A press
+  -- reaches -- already knows how to open the move list, refuse RUN, show the
+  -- PP-empty error and so on, so a direct-select hotkey is built the same way
+  -- Gen 1/2's `battle.menuIndex = command.index` line is: point the cursor at
+  -- the wanted row first, then hand Ui one synthetic A press and let its own
+  -- logic decide what that selection does.  Nothing about move/command
+  -- resolution is reimplemented here.
+  local gen3battle = {}
+  battle.gen3 = gen3battle
+
+  local function optionalG3(name)
+    local ok, found = pcall(require, name)
+    if ok and type(found) == "table" then return found end
+    return nil
+  end
+
+  local G3Battle = optionalG3("src.core.game3.battle")
+  local G3Ui = optionalG3("src.core.game3.battle.ui")
+  gen3battle.available = G3Battle ~= nil and G3Ui ~= nil
+    and type(G3Battle.isActive) == "function"
+    and type(G3Ui.handleInput) == "function"
+
+  -- Good for exactly one Ui.handleInput call: input:wasPressed(name) is the
+  -- entire interface Ui ever calls on it.
+  local function onePress(name)
+    return { wasPressed = function(_, pressedName) return pressedName == name end }
+  end
+
+  function gen3battle.active()
+    return gen3battle.available and G3Battle.isActive() == true
+  end
+
+  -- The Old Man's Viridian tutorial battle drives its own actions from a
+  -- script, same reason Red's demo battle and Gold's DUDE catch tutorial are
+  -- excluded in battle.scripted above; Ui.handleInput itself refuses input
+  -- during it, but the check is repeated here so commandMenuOpen answers
+  -- honestly rather than reporting a menu that no press could ever reach.
+  local function gen3Scripted()
+    return G3Ui._st and G3Ui._st.oldManTutorial == true
+  end
+
+  function gen3battle.commandMenuOpen()
+    return gen3battle.active() and G3Ui._mode == "menu" and not gen3Scripted()
+  end
+
+  function gen3battle.moveSelectOpen()
+    return gen3battle.active() and G3Ui._mode == "moves" and not gen3Scripted()
+  end
+
+  -- FIGHT/BAG/POKEMON/RUN in a normal battle, BALL/BAIT/ROCK/RUN in a Safari
+  -- one -- both are four rows in the same physical grid, and RUN is always
+  -- the fourth, which is all a direct-select hotkey needs to know.
+  function gen3battle.submitCommand(index)
+    if not gen3battle.commandMenuOpen() then return false end
+    G3Ui._menuIndex = index
+    G3Ui.handleInput(onePress("a"))
+    return true
+  end
+
+  -- The live battler's move list, so callers can check a slot is actually
+  -- there before spending a press on it -- exactly the
+  -- `moves[command.index]` guard the Gen 1/2 path already makes.
+  function gen3battle.moves()
+    if not gen3battle.active() then return nil end
+    local mon = G3Ui._st and G3Ui._st.player and G3Ui._st.player.mon
+    return mon and mon.moves
+  end
+
+  function gen3battle.submitMove(index)
+    if not gen3battle.moveSelectOpen() then return false end
+    local moves = gen3battle.moves()
+    local mv = moves and moves[index]
+    if not mv or mv == 0 or mv == "" then return false end
+    G3Ui._moveIndex = index
+    G3Ui.handleInput(onePress("a"))
+    return true
+  end
+
   shared.battle = battle
 
   -- ----------------------------------------------------------------- the world

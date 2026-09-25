@@ -1,5 +1,36 @@
 # Changelog
 
+## [1.17.0] - 2026-10-09
+
+### Added
+
+- **Battle command hotkeys (FIGHT/PKMN/ITEM/RUN direct-select and the RUN
+  shortcut) now work on Gen 3.** FireRed's battle has no pushed stack state
+  for a mod to find at all — it is two engine singletons instead: `Battle`
+  (is one running) and `Ui` (owns the command/move cursor and reads input).
+  `features/gen.lua` gained a `battle.gen3` namespace that points `Ui`'s own
+  cursor fields (`_menuIndex`/`_moveIndex`) at the wanted row and then hands
+  `Ui.handleInput` one synthetic A press — the exact entry point a real
+  press reaches — so fight-shortcut/struggle fallback, PP-empty refusal,
+  RUN-eligibility, Safari's BALL/BAIT/ROCK/RUN mapping, and opening the move
+  list are all still decided by the cart's own logic, never reimplemented.
+  Because FireRed's native cursor jumps to and highlights whatever row was
+  pointed at, no new draw code was needed for this — the existing overlay
+  legend (`mod.hooks:wrap("battle.overlay", ...)`) was already Gen 1/2-only
+  and stays that way. `command_menu.lua`'s `commandReady`/`moveReady`/
+  `choose`/`chooseMove`/`runFromMenu` now fall back to these primitives
+  whenever Gen 1/2's own battle-state lookup comes back empty.
+
+### Known gaps
+
+- **FLY remains unsupported on Gen 3.** FireRed's own `WorldAPI:flyTo`
+  unconditionally refuses with "not supported on FireRed yet": real fly
+  destinations are the region map's town spawn points
+  (`src/ui/game3/region_map.lua`), which have no public seam a mod can
+  drive yet. This is an engine-side gap, not a mod oversight, and the
+  travel hotkey's FLY option stays FireRed-unavailable until that lands
+  upstream.
+
 ## [1.16.0] - 2026-10-08
 
 ### Fixed

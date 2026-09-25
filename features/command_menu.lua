@@ -82,22 +82,32 @@ return function(mod, suite)
     shared.store.set("battleHotkeys", cfg)
   end
 
+  local G3 = shared.battle.gen3
+
   local function battleState(game)
     return shared.battle.find(game)
   end
 
+  -- Gen 1/2 pass the pushed battle state they found; FireRed keeps none, so
+  -- a nil `battle` here falls through to Ui's own singleton cursor instead.
   local function commandReady(battle)
-    if not shared.battle.commandMenuOpen(battle) then return false end
-    if battle.safari then return (battle.safari.balls or 0) > 0 end
-    local hp = shared.battle.fighterHp(battle)
-    if not hp or hp <= 0 then return false end
-    return true
+    if battle then
+      if not shared.battle.commandMenuOpen(battle) then return false end
+      if battle.safari then return (battle.safari.balls or 0) > 0 end
+      local hp = shared.battle.fighterHp(battle)
+      if not hp or hp <= 0 then return false end
+      return true
+    end
+    return G3 ~= nil and G3.commandMenuOpen()
   end
 
   local function moveReady(battle)
-    return shared.battle.moveSelectOpen(battle)
-      and type(shared.battle.moves(battle)) == "table"
-      and not battle.moveSwapIndex
+    if battle then
+      return shared.battle.moveSelectOpen(battle)
+        and type(shared.battle.moves(battle)) == "table"
+        and not battle.moveSwapIndex
+    end
+    return G3 ~= nil and G3.moveSelectOpen()
   end
 
   local function customBattleUI(battle)
@@ -110,42 +120,56 @@ return function(mod, suite)
 
   local function choose(game, direction)
     local command = COMMANDS[direction]
+    if not command then return false end
     local battle = battleState(game)
-    if not command or not commandReady(battle) then return false end
-    battle.menuIndex = command.index
-    Sound.play(shared.battle.data(battle), "Press_AB")
-    if battle.safari then
-      battle:chooseSafari(({ "ball", "bait", "rock", "run" })[command.index])
-    else
-      battle:chooseMenu(command.action)
+    if battle then
+      if not commandReady(battle) then return false end
+      battle.menuIndex = command.index
+      Sound.play(shared.battle.data(battle), "Press_AB")
+      if battle.safari then
+        battle:chooseSafari(({ "ball", "bait", "rock", "run" })[command.index])
+      else
+        battle:chooseMenu(command.action)
+      end
+      return true
     end
-    return true
+    -- Ui.handleInput plays its own selection sound and decides for itself
+    -- what the row does (open moves/bag/party, refuse RUN, ...), so nothing
+    -- else is needed here beyond pointing its cursor at the wanted row.
+    return G3 ~= nil and G3.submitCommand(command.index)
   end
 
   local function chooseMove(game, direction)
     local command = COMMANDS[direction]
+    if not command then return false end
     local battle = battleState(game)
-    local moves = battle and shared.battle.moves(battle)
-    if not command or not moveReady(battle) or not moves[command.index] then
-      return false
+    if battle then
+      local moves = shared.battle.moves(battle)
+      if not moveReady(battle) or not (moves and moves[command.index]) then
+        return false
+      end
+      battle.moveIndex = command.index
+      Sound.play(shared.battle.data(battle), "Press_AB")
+      battle:chooseMove(command.index)
+      return true
     end
-    battle.moveIndex = command.index
-    Sound.play(shared.battle.data(battle), "Press_AB")
-    battle:chooseMove(command.index)
-    return true
+    return G3 ~= nil and G3.submitMove(command.index)
   end
 
   local function runFromMenu(game)
     local battle = battleState(game)
-    if not commandReady(battle) then return false end
-    battle.menuIndex = 4
-    Sound.play(shared.battle.data(battle), "Press_AB")
-    if battle.safari then
-      battle:chooseSafari("run")
-    else
-      battle:chooseMenu("run")
+    if battle then
+      if not commandReady(battle) then return false end
+      battle.menuIndex = 4
+      Sound.play(shared.battle.data(battle), "Press_AB")
+      if battle.safari then
+        battle:chooseSafari("run")
+      else
+        battle:chooseMenu("run")
+      end
+      return true
     end
-    return true
+    return G3 ~= nil and G3.submitCommand(4)
   end
 
   for _, inputId in ipairs({ "keyboard", "gamepad" }) do
