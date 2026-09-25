@@ -361,6 +361,25 @@ return function(mod, suite)
     return true
   end
 
+  -- Whichever row Ui's own cursor sits on right now -- the same index its
+  -- native "->" selector pip draws at (src/ui/game3/window.lua's cursorPx,
+  -- same pixel this suite's command-menu overlay reuses).  Callers use this
+  -- to skip drawing their own row marker on top of that native pip instead
+  -- of guessing at a second, non-colliding spot for it.
+  function gen3battle.selectedIndex()
+    if gen3battle.commandMenuOpen() then return G3Ui._menuIndex end
+    if gen3battle.moveSelectOpen() then return G3Ui._moveIndex end
+    return nil
+  end
+
+  -- FIGHT is row 1 of the normal menu, but row 1 of a Safari battle's menu
+  -- is BALL (commands.lua's SAFARI_MENU) -- there is no move list to jump
+  -- into there, so this refuses instead of spending the player's balls.
+  function gen3battle.submitFight()
+    if G3Ui._st and G3Ui._st.safari then return false end
+    return gen3battle.submitCommand(1)
+  end
+
   shared.battle = battle
 
   -- ----------------------------------------------------------------- the world

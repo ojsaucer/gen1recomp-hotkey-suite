@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.17.2] - 2026-10-09
+
+### Added
+
+- **DEFAULT MENU option (BATTLE CMD MENU)**: set the battle menu that opens
+  each turn to MOVES instead of FIGHT/PKMN/ITEM/RUN. Works the same way on
+  all three generations — one synthetic FIGHT press the instant a genuinely
+  new command menu opens, so cancelling back out of the move list still
+  reaches PKMN/ITEM/RUN normally instead of being bounced straight back into
+  the move list. Safari-style battles (no FIGHT/move list at all) are left
+  alone.
+
+### Fixed
+
+- **Gen 3's command/move-list arrow glyphs overlapped FireRed's own "▶"
+  cursor pip.** 1.17.1 drew this suite's hotkey-row glyphs at the identical
+  pixel `src/core/game3/battle/ui.lua`'s own `cursorPos` tables use for the
+  native selector arrow, so whichever row was currently selected showed two
+  different glyphs superimposed on one pixel. Fixed by skipping the custom
+  glyph on the currently-selected row (native cursor already marks it there)
+  and shifting the remaining three rows' glyphs 2px left of that pixel.
+
 ## [1.17.1] - 2026-10-09
 
 ### Fixed

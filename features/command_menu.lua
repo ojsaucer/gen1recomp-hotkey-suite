@@ -37,11 +37,13 @@ return function(mod, suite)
 
   -- Where FireRed itself puts each row's own selection pip, straight from
   -- src/core/game3/battle/ui.lua's draw_action_menu/draw_move_menu (the
-  -- `cursorPos` tables there) -- so the hotkey glyph lands on the exact same
-  -- native (240x160) pixel Ui's own cursor would use for that row, on every
-  -- screen size, rather than a second, guessed-at layout.
-  local G3_COMMAND_ARROW_XY = { { 128, 122 }, { 176, 122 }, { 128, 138 }, { 176, 138 } }
-  local G3_MOVE_ARROW_XY = { { 8, 122 }, { 80, 122 }, { 8, 138 }, { 80, 138 } }
+  -- `cursorPos` tables there), nudged 2px left of that exact spot -- close
+  -- enough to still read as "this row's" marker on every screen size, but
+  -- off the one pixel Ui's own cursor draws on so the two glyphs don't have
+  -- to share a spot (see drawGen3CommandUI below for the other half of
+  -- that: skipping the currently-selected row entirely).
+  local G3_COMMAND_ARROW_XY = { { 126, 122 }, { 174, 122 }, { 126, 138 }, { 174, 138 } }
+  local G3_MOVE_ARROW_XY = { { 6, 122 }, { 78, 122 }, { 6, 138 }, { 78, 138 } }
   local G3_DIRECTION_GLYPH -- filled in below once FrlgFont is known to exist
   if FrlgFont then
     G3_DIRECTION_GLYPH = {
@@ -103,6 +105,7 @@ return function(mod, suite)
       cfg.legendLayout = "auto"
     end
     if cfg.moveInfo == nil then cfg.moveInfo = false end
+    if cfg.defaultMoves == nil then cfg.defaultMoves = false end
     return cfg
   end
 
@@ -516,29 +519,71 @@ return function(mod, suite)
   -- there is nothing to draw *instead* of it. What was missing is the same
   -- "which physical key does this row" marker Gen 1/2's overlay draws at each
   -- corner; drawn here with FireRed's own arrow glyphs (see G3_DIRECTION_GLYPH
-  -- above) at the exact pixel Ui's own cursor uses for that row.
+  -- above) near the pixel Ui's own cursor uses for that row -- except on the
+  -- row that's actually selected, where Ui already draws its own "->" pip at
+  -- that exact spot and this glyph would only double up on top of it.
   local function drawGen3CommandUI(viewport)
     if not (FrlgFont and G3) then return end
     local commandOpen = G3.commandMenuOpen()
     local moveOpen = not commandOpen and G3.moveSelectOpen()
     if not (commandOpen or moveOpen) then return end
     local positions = commandOpen and G3_COMMAND_ARROW_XY or G3_MOVE_ARROW_XY
+    local selected = G3.selectedIndex and G3.selectedIndex()
     local g = love.graphics
     g.push("all")
     g.origin()
     g.translate(viewport.gameX or 0, viewport.gameY or 0)
     g.scale(viewport.scale or 1)
     for index, direction in ipairs(DIRECTION_FOR_INDEX) do
-      local pos = positions[index]
-      local glyph = G3_DIRECTION_GLYPH[direction]
-      if pos and glyph then
-        FrlgFont.drawGlyph(glyph, pos[1], pos[2], {
-          colors = FrlgFont.COLOR.NORMAL,
-        })
+      if index ~= selected then
+        local pos = positions[index]
+        local glyph = G3_DIRECTION_GLYPH[direction]
+        if pos and glyph then
+          FrlgFont.drawGlyph(glyph, pos[1], pos[2], {
+            colors = FrlgFont.COLOR.NORMAL,
+          })
+        end
       end
     end
     g.pop()
   end
+
+  -- DEFAULT MOVES sends the fresh command menu straight into the move list
+  -- instead of leaving FIGHT/PKMN/ITEM/RUN on screen, one synthetic FIGHT
+  -- press per genuinely new menu -- not a repeated one, or Cancel out of the
+  -- move list would be shoved straight back into it and could never actually
+  -- reach PKMN/ITEM/RUN.  A "fresh" menu is any entry that did not come from
+  -- that Cancel: watching the previous frame's phase/mode is enough to tell
+  -- the two apart without touching engine state.
+  local prevPhaseG12
+  local prevG3Command, prevG3Moves = false, false
+
+  mod.hooks:wrap("input.step", function(next, game, dt)
+    next(game, dt)
+    if not config().defaultMoves then
+      prevPhaseG12, prevG3Command, prevG3Moves = nil, false, false
+      return
+    end
+    local battle = battleState(game)
+    if battle then
+      local phase = battle.phase
+      if phase == "menu" and prevPhaseG12 ~= "menu"
+          and not shared.battle.moveSelectOpen({ phase = prevPhaseG12 })
+          and not battle.safari then
+        battle:chooseMenu("fight")
+        phase = battle.phase
+      end
+      prevPhaseG12 = phase
+    elseif G3 then
+      local cmdOpen = G3.commandMenuOpen()
+      local movesOpen = not cmdOpen and G3.moveSelectOpen()
+      if cmdOpen and not prevG3Command and not prevG3Moves then
+        G3.submitFight()
+        cmdOpen, movesOpen = G3.commandMenuOpen(), G3.moveSelectOpen()
+      end
+      prevG3Command, prevG3Moves = cmdOpen, movesOpen
+    end
+  end)
 
   mod.hooks:wrap("render.hud", function(next, game, viewport)
     next(game, viewport)
@@ -721,6 +766,28 @@ return function(mod, suite)
           return true
         end,
       },
+      {
+        id = "battle.defaultMoves",
+        label = "DEFAULT MENU",
+        value = function()
+          return config().defaultMoves and "MOVES" or "COMMANDS"
+        end,
+        help = "MOVES opens straight to the move list instead of "
+          .. "FIGHT/PKMN/ITEM/RUN each turn. Cancelling out of the move "
+          .. "list still reaches the other three normally.",
+        step = function()
+          local cfg = config()
+          cfg.defaultMoves = not cfg.defaultMoves
+          save(cfg)
+          return true
+        end,
+        unassign = function()
+          local cfg = config()
+          cfg.defaultMoves = false
+          save(cfg)
+          return true
+        end,
+      },
     }
   end
 
@@ -737,6 +804,7 @@ return function(mod, suite)
     local cfg = config()
     cfg.enabled = false
     cfg.moveInfo = false
+    cfg.defaultMoves = false
     save(cfg)
     active.keyboard, active.gamepad = false, false
   end)
