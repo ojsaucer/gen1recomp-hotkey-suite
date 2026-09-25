@@ -643,6 +643,53 @@ return function(mod, suite)
     return nil
   end
 
+  -- Gold's own DIG/ESCAPE ROPE spin (World:runEscapeWarp + digReturn, "Shared
+  -- by the party-menu DIG/TELEPORT action and BagMenu's ESCAPE ROPE so all
+  -- three animate identically" per World:beginTeleportOut's own Gen 1
+  -- comment) instead of warpToSpawn's silent instant cut, so RETURN CENTER
+  -- feels the same on Gold as it already does on Red.  runEscapeWarp does
+  -- not re-derive its destination the way the rope's own escapeRopeTarget
+  -- does (that one is CAVE/DUNGEON-gated) -- it just animates whatever
+  -- destMapId/destWarp it is handed -- so healPoint()'s answer is reshaped
+  -- straight into that shape, keeping RETURN CENTER usable anywhere the
+  -- unanimated version already was.
+  function world.animatedCenterWarpGen2(ow)
+    if type(ow) ~= "table" or type(ow.runEscapeWarp) ~= "function" then
+      return false
+    end
+    local target = ow:healPoint()
+    if not (target and target.map) then return false end
+    ow:runEscapeWarp(target.map, { x = target.x, y = target.y })
+    return true
+  end
+
+  -- FireRed's own DIG/ESCAPE ROPE/Silph Co teleporter spin -- pokefirered's
+  -- "warpteleport" script warp kind (src/field_fadetransition.c:609), played
+  -- through src/core/game3/warp.lua's own Warp.scripted -- instead of
+  -- ow.warpToHealPoint()'s silent instant Field.respawnAtHeal. Warp.scripted
+  -- sits below the mod-facing WorldAPI surface entirely (ow.warpToHealPoint
+  -- does not use it either), so it is reached directly here the same way
+  -- battle.gen3 reaches into src/core/game3/battle for Gen 3 battle state.
+  --
+  -- ow.warpToHealPoint also cannot safely be called with `:` -- Gen3Compat
+  -- (src/mods/Gen3Compat.lua) defines it as a plain function whose one
+  -- positional parameter is `onDone`, so a colon call there hands it `ow`
+  -- itself as onDone, and its own "if onDone then onDone() end" tries to
+  -- call that table and errors.  Calling it with `.` (as the fallback below
+  -- does) avoids that entirely.
+  function world.animatedCenterWarpGen3(game, ow)
+    local target = ow.healPoint and ow.healPoint()
+    if not (target and target.gen3Map) then return false end
+    local ok, Warp = pcall(require, "src.core.game3.warp")
+    if not (ok and type(Warp) == "table" and type(Warp.scripted) == "function") then
+      return false
+    end
+    if type(Warp.isBusy) == "function" and Warp.isBusy() then return false end
+    Warp.scripted(nil, game, "warpteleport", target.gen3Map, target.x,
+      target.y, "down", nil)
+    return true
+  end
+
   shared.world = world
 
   -- ------------------------------------------------------------ the start menu

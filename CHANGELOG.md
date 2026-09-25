@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.17.4] - 2026-10-09
+
+### Fixed
+
+- **RETURN CENTER was an instant, silent cut on Gold and FireRed** instead of
+  the DIG/TELEPORT-style spin Red's own `beginTeleportOut` already played.
+  Gold now plays the same spin animation the party menu's own DIG/TELEPORT
+  action and the BagMenu's ESCAPE ROPE use (`World:runEscapeWarp` /
+  `digReturn`), aimed at the heal point instead of the rope's own
+  cave-only destination. FireRed now plays pokefirered's own teleporter spin
+  (`Warp.scripted(..., "warpteleport", ...)`, the same one Silph Co's and
+  Sabrina's Gym's warp tiles use) instead of a bare `Field.respawnAtHeal`.
+  This also fixes a latent crash on FireRed: `ow:warpToHealPoint()`'s colon
+  call handed the compat shim's plain `onDone` parameter the whole `ow`
+  table, which its own `if onDone then onDone() end` then tried to call.
+
 ## [1.17.3] - 2026-10-09
 
 ### Added

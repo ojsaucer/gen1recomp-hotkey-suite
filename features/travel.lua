@@ -142,7 +142,19 @@ return function(mod, suite)
         notify(game, "Visit a POKEMON\nCENTER first.")
         return false
       end
-      if mode == "healPoint" then ow:warpToHealPoint() else ow:warpToSpawn() end
+      -- Both branches play the same DIG/ESCAPE ROPE-style spin Gen 1's own
+      -- beginTeleportOut already does below, falling back to the old silent
+      -- instant warp only if that animated path is not reachable for some
+      -- reason.
+      if mode == "healPoint" then
+        if not shared.world.animatedCenterWarpGen3(game, ow) then
+          ow.warpToHealPoint()
+        end
+      else
+        if not shared.world.animatedCenterWarpGen2(ow) then
+          ow:warpToSpawn()
+        end
+      end
       return true
     end
     if mode ~= "teleportOut" then
