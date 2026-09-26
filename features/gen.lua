@@ -269,6 +269,52 @@ return function(mod, suite)
     return { 8, 112 }
   end
 
+  -- WIDE layout's "EXTENDED" battle HUD can DOCK the bottom command/move box
+  -- to the playfield's own edge instead of drawing it at the fixed y every
+  -- other layout uses (src/ui/gen2/BattleState.lua's extendedHUD, gated
+  -- further on BATTLE SIZE/BATTLE BG -- a non-white BG only docks when
+  -- BATTLE SIZE is not "fill", so toggling that setting can flip docking on
+  -- or off outright).  Docked, WideBattle.drawDocked slides the whole bottom
+  -- box by its own dockOffsets() before drawing it, so a marker drawn at
+  -- commandArrowXs/moveArrowXs's plain y would land on empty screen instead
+  -- of the box the moment docking is active.  Ported from WideBattle's own
+  -- math -- its scale, origin and playfield inputs are all public functions,
+  -- but the offset itself is a local nothing else exposes -- rather than
+  -- reaching into a closure that does not exist for a mod to read.
+  function battle.commandBoxOffsetY(b)
+    if not goldBattle(b) then return 0 end
+    local okW, WideBattle = pcall(require, "src.ui.gen2.WideBattle")
+    if not (okW and type(WideBattle) == "table"
+        and type(WideBattle.docked) == "function"
+        and type(WideBattle.dockOffsets) == "function") then
+      return 0
+    end
+    local okD, docked = pcall(WideBattle.docked, b)
+    if not (okD and docked) then return 0 end
+    local okC, Chrome = pcall(require, "src.ui.gen2.Chrome")
+    if not (okC and type(Chrome) == "table") then return 0 end
+    local okV, GameViewport = pcall(require, "src.render.GameViewport")
+    if not (okV and type(GameViewport) == "table"
+        and type(GameViewport.dimensions) == "function") then
+      return 0
+    end
+    local okDim, winW, winH = pcall(GameViewport.dimensions)
+    if not (okDim and type(winW) == "number" and type(winH) == "number") then
+      return 0
+    end
+    if type(b.battlePanelScale) ~= "function" then return 0 end
+    local okS, scale = pcall(b.battlePanelScale, b, winW, winH)
+    if not (okS and type(scale) == "number" and scale > 0) then return 0 end
+    local okO, _, oy = pcall(Chrome.fitOriginFor, winW, winH, scale,
+      WideBattle.TILES_W, WideBattle.TILES_H)
+    if not okO then return 0 end
+    local okP, _, py, _, ph = pcall(Chrome.playfieldRect, winW, winH)
+    if not okP then return 0 end
+    local okOff, _, bottomY = pcall(WideBattle.dockOffsets, scale, oy, py, ph)
+    if not (okOff and type(bottomY) == "number") then return 0 end
+    return bottomY
+  end
+
   -- ------------------------------------------------------------- Gen 3 battle
   --
   -- FireRed's battle is not a pushed state a mod can find on `game.stack` --

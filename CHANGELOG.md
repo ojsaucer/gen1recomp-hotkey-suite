@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.17.5] - 2026-10-09
+
+### Added
+
+- **DIRECT SELECT (BATTLE CMD MENU)**: retires the CMD MODE hold entirely
+  when turned on. Any bare D-pad/direction press while the command menu or
+  move list is genuinely open instantly chooses that row, with no combo
+  held down first, on all three generations. CMD MODE and RUN still work as
+  their own separate presses either way, and a direction press outside a
+  battle (or with no menu open) still falls through to whatever it would
+  normally do -- this never hijacks overworld movement.
+
+### Fixed
+
+- **Gold's command/move-menu arrow markers landed on empty screen whenever
+  the WIDE + EXTENDED battle HUD docked its bottom box to the playfield
+  edge.** `WideBattle.drawDocked` slides that whole box by its own
+  `dockOffsets()` before drawing it, but this suite's arrow overlay always
+  drew at the fixed y every other layout uses, missing the box entirely
+  once docking kicked in. Docking itself depends partly on BATTLE SIZE
+  (fit/fill) for a non-white BATTLE BG, which is what made toggling that
+  setting look like it was moving the markers around. Fixed by porting
+  WideBattle's own offset math (its scale, origin and playfield inputs are
+  all public) and applying it to the markers whenever docking is active.
+
 ## [1.17.4] - 2026-10-09
 
 ### Fixed

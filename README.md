@@ -36,6 +36,7 @@ Each module below has its own **ENABLED** master switch (**OFF** by default).
 
 ### ⚔️ Battle Command Menu
 - **Command Mode:** Hold a hotkey and press D-Pad / Direction keys (`Up`, `Right`, `Left`, `Down`) to directly select **FIGHT**, **PKMN**, **ITEM**, or **RUN**—just like in Pokemon Stadium.
+- **Direct Select:** Optional setting that retires the CMD MODE hold entirely—any bare direction press instantly chooses a row whenever the command menu or move list is open.
 - **Instant Run:** Dedicated hotkey to attempt fleeing directly from the main battle menu.
 - **Custom Battle UI Compatible:** Automatically adapts to modded battle UIs (e.g. Floating Battle HUD, Voxel Ascendant) with a floating directional legend and real move names.
 - **Move Info:** Optionally adds a second line to each move showing its attack power beside a sword icon, its type abbreviated to three characters, and its accuracy as `##%`.

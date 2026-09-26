@@ -112,11 +112,26 @@ return function(mod, suite)
     end
     if cfg.moveInfo == nil then cfg.moveInfo = false end
     if cfg.defaultMoves == nil then cfg.defaultMoves = false end
+    if cfg.directSelect == nil then cfg.directSelect = false end
     return cfg
   end
 
   local function save(cfg)
     shared.store.set("battleHotkeys", cfg)
+  end
+
+  -- Whether the command/move-menu hotkey machinery should be considered
+  -- "on" for this frame -- either the CMD MODE combo is actually held, or
+  -- DIRECT SELECT is enabled, which retires the combo requirement entirely
+  -- and treats every bare direction press in battle as command mode. Every
+  -- draw site below that used to read "active.keyboard or active.gamepad"
+  -- reads this instead, so the overlay/legend and the native-cursor hide
+  -- stay in sync with DIRECT SELECT the same way they already track a held
+  -- combo.
+  local function hotkeysActive()
+    if active.keyboard or active.gamepad then return true end
+    local cfg = config()
+    return cfg.enabled and cfg.directSelect or false
   end
 
   local G3 = shared.battle.gen3
@@ -244,18 +259,29 @@ return function(mod, suite)
   for _, inputId in ipairs({ "keyboard", "gamepad" }) do
     local current = inputId
     shared.onRaw(inputId, function(name, pressed, game)
-      if not config().enabled then
+      local cfg = config()
+      if not cfg.enabled then
         active[current] = false
         return
       end
       local direction = DIRECTIONS[name]
-      if pressed and active[current] and direction then
-        local battle = battleState(game)
-        if moveReady(battle) then
-          chooseMove(game, direction)
-        else
-          choose(game, direction)
-        end
+      if not (pressed and direction) then return end
+      local battle = battleState(game)
+      local allowed = active[current]
+      if not allowed and cfg.directSelect then
+        -- No CMD MODE combo held: registerHotkey's own context="battle"
+        -- gate is what normally keeps active[current] from ever going true
+        -- outside a battle, so with that combo skipped entirely a bare
+        -- D-pad press needs its own proof the command or move menu is
+        -- genuinely open right now, or every overworld step would fire a
+        -- battle command that has nothing to land on.
+        allowed = commandReady(battle) or moveReady(battle)
+      end
+      if not allowed then return end
+      if moveReady(battle) then
+        chooseMove(game, direction)
+      else
+        choose(game, direction)
       end
     end)
   end
@@ -472,24 +498,32 @@ return function(mod, suite)
 
   mod.hooks:wrap("battle.overlay", function(next, battle)
     next(battle)
-    if not (active.keyboard or active.gamepad) then return end
+    if not hotkeysActive() then return end
     if customBattleUI(battle) then return end
     onBattleHUD(battle, function()
       love.graphics.push("all")
       love.graphics.setColor(1, 1, 1, 1)
       local wide = shared.battle.wideLayout(battle)
+      -- WIDE + EXTENDED battle HUD can dock the whole bottom box to the
+      -- playfield edge instead of its usual y (see commandBoxOffsetY) --
+      -- BATTLE SIZE (fit/fill) is one of the settings that flips this on or
+      -- off for a non-white BATTLE BG, which is why toggling it can look
+      -- like it moves these markers: docked, the real box has moved and an
+      -- un-offset marker would be drawn over empty screen instead of it.
+      local dy = shared.battle.commandBoxOffsetY
+        and shared.battle.commandBoxOffsetY(battle) or 0
       if commandReady(battle) then
         local xs = shared.battle.commandArrowXs(battle, wide)
         for index = 1, 4 do
           local col = (index - 1) % 2
           local row = math.floor((index - 1) / 2)
-          love.graphics.rectangle("fill", xs[col + 1], 112 + row * 16, 8, 8)
+          love.graphics.rectangle("fill", xs[col + 1], dy + 112 + row * 16, 8, 8)
         end
         love.graphics.setColor(0, 0, 0, 1)
         for index, direction in ipairs(DIRECTION_FOR_INDEX) do
           local col = (index - 1) % 2
           local row = math.floor((index - 1) / 2)
-          drawArrow(xs[col + 1], 112 + row * 16, direction)
+          drawArrow(xs[col + 1], dy + 112 + row * 16, direction)
         end
       elseif moveReady(battle) then
         local xs = shared.battle.moveArrowXs(battle, wide)
@@ -498,21 +532,21 @@ return function(mod, suite)
             local col = (index - 1) % 2
             local row = math.floor((index - 1) / 2)
             love.graphics.rectangle("fill", xs[col + 1],
-              112 + row * 16, 8, 8)
+              dy + 112 + row * 16, 8, 8)
           end
           love.graphics.setColor(0, 0, 0, 1)
           for index, direction in ipairs(DIRECTION_FOR_INDEX) do
             local col = (index - 1) % 2
             local row = math.floor((index - 1) / 2)
-            drawArrow(xs[col + 1], 112 + row * 16, direction)
+            drawArrow(xs[col + 1], dy + 112 + row * 16, direction)
           end
         else
           for index = 1, 4 do
-            love.graphics.rectangle("fill", 40, 96 + index * 8, 8, 8)
+            love.graphics.rectangle("fill", 40, dy + 96 + index * 8, 8, 8)
           end
           love.graphics.setColor(0, 0, 0, 1)
           for index, direction in ipairs(DIRECTION_FOR_INDEX) do
-            drawArrow(40, 96 + index * 8, direction)
+            drawArrow(40, dy + 96 + index * 8, direction)
           end
         end
       end
@@ -565,7 +599,7 @@ return function(mod, suite)
   -- suite's own drawn to replace it).
   local function withNativeCursorHidden(body)
     local hide = FrlgFont and G3Window and G3
-      and (active.keyboard or active.gamepad)
+      and hotkeysActive()
       and (G3.commandMenuOpen() or G3.moveSelectOpen())
     if not hide then return body() end
     local original = G3Window.cursorPx
@@ -619,12 +653,12 @@ return function(mod, suite)
     customLegend = nil
     local battle = battleState(game)
     if not battle then
-      if (active.keyboard or active.gamepad) and viewport then
+      if hotkeysActive() and viewport then
         drawGen3CommandUI(viewport)
       end
       return
     end
-    if not ((active.keyboard or active.gamepad) and customBattleUI(battle)
+    if not (hotkeysActive() and customBattleUI(battle)
         and viewport) then
       return
     end
@@ -722,6 +756,28 @@ return function(mod, suite)
         end,
         unassign = function()
           shared.setBinding(runSpec, nil)
+          return true
+        end,
+      },
+      {
+        id = "battle.directSelect",
+        label = "DIRECT SELECT",
+        value = function() return config().directSelect and "ON" or "OFF" end,
+        help = "ON retires the CMD MODE hold entirely: any bare D-pad/"
+          .. "direction press while the command menu or move list is open "
+          .. "instantly chooses that row, no combo held down first. CMD "
+          .. "MODE and RUN still work as their own separate presses either "
+          .. "way.",
+        step = function()
+          local cfg = config()
+          cfg.directSelect = not cfg.directSelect
+          save(cfg)
+          return true
+        end,
+        unassign = function()
+          local cfg = config()
+          cfg.directSelect = false
+          save(cfg)
           return true
         end,
       },
@@ -833,6 +889,7 @@ return function(mod, suite)
     cfg.enabled = false
     cfg.moveInfo = false
     cfg.defaultMoves = false
+    cfg.directSelect = false
     save(cfg)
     active.keyboard, active.gamepad = false, false
   end)
